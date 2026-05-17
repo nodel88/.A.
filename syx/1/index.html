@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>滑动小游戏 - 像刷抖音一样玩游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: #faf8ef;
+            touch-action: pan-y;
+        }
+        
+        .container {
+            height: 100%;
+            transition: transform 0.3s ease-out;
+        }
+        
+        .game-slide {
+            height: 100vh;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .game-iframe {
+            width: 100%;
+            height: calc(100vh - 60px);
+            border: none;
+            display: block;
+        }
+        
+        .bottom-bar {
+            height: 60px;
+            background: linear-gradient(135deg, #faf8ef 0%, #eee4da 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            border-top: 2px solid #bbada0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .username {
+            font-weight: bold;
+            color: #776e65;
+            font-size: 16px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        
+        .stat-item:hover {
+            background: rgba(187, 173, 160, 0.2);
+        }
+        
+        .stat-number {
+            font-weight: bold;
+            color: #776e65;
+            font-size: 18px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #bbada0;
+        }
+        
+        .nav-buttons {
+            position: fixed;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+        
+        .nav-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #bbada0;
+            font-size: 24px;
+            color: #776e65;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .nav-btn:hover {
+            background: #faf8ef;
+            transform: scale(1.1);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: #faf8ef;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee4da;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #776e65;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #bbada0;
+            cursor: pointer;
+        }
+        
+        .game-list {
+            list-style: none;
+        }
+        
+        .game-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #eee4da;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .game-list-item:hover {
+            background: #e0d2bd;
+        }
+        
+        .game-name {
+            font-weight: 500;
+            color: #776e65;
+        }
+        
+        .remove-btn {
+            background: #f65e3b;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #bbada0;
+            padding: 40px 0;
+        }
+        
+        @media (max-width: 480px) {
+            .nav-buttons {
+                right: 10px;
+            }
+            
+            .nav-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+            
+            .stats {
+                gap: 10px;
+            }
+            
+            .stat-number {
+                font-size: 16px;
+            }
+            
+            .stat-label {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="container">
+        <div class="game-slide">
+            <iframe class="game-iframe" src="game1.html" data-game-id="1" data-game-name="数字消消乐"></iframe>
+        </div>
+        <div class="game-slide">
+            <iframe class="game-iframe" src="game2.html" data-game-id="2" data-game-name="记忆翻牌"></iframe>
+        </div>
+        <div class="game-slide">
+            <iframe class="game-iframe" src="game3.html" data-game-id="3" data-game-name="贪吃蛇"></iframe>
+        </div>
+        <div class="game-slide">
+            <iframe class="game-iframe" src="game4.html" data-game-id="4" data-game-name="打砖块"></iframe>
+        </div>
+        <div class="game-slide">
+            <iframe class="game-iframe" src="game5.html" data-game-id="5" data-game-name="井字棋"></iframe>
+        </div>
+        <div class="game-slide">
+            <iframe class="game-iframe" src="game6.html" data-game-id="6" data-game-name="俄罗斯方块"></iframe>
+        </div>
+        <div class="game-slide">
+            <iframe class="game-iframe" src="game7.html" data-game-id="7" data-game-name="2048经典版"></iframe>
+        </div>
+    </div>
+    
+    <div class="bottom-bar">
+        <div class="user-info">
+            <span class="username" id="username">玩家</span>
+        </div>
+        <div class="stats">
+            <div class="stat-item" id="played-btn">
+                <span class="stat-number" id="played-count">0</span>
+                <span class="stat-label">已玩</span>
+            </div>
+            <div class="stat-item" id="collected-btn">
+                <span class="stat-number" id="collected-count">0</span>
+                <span class="stat-label">收藏</span>
+            </div>
+            <div class="stat-item" id="liked-btn">
+                <span class="stat-number" id="liked-count">0</span>
+                <span class="stat-label">点赞</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="nav-buttons">
+        <button class="nav-btn" id="up-btn">↑</button>
+        <button class="nav-btn" id="down-btn">↓</button>
+    </div>
+    
+    <!-- 已玩游戏模态框 -->
+    <div class="modal" id="played-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">已玩游戏</h3>
+                <button class="close-btn" data-modal="played-modal">&times;</button>
+            </div>
+            <ul class="game-list" id="played-list"></ul>
+        </div>
+    </div>
+    
+    <!-- 收藏游戏模态框 -->
+    <div class="modal" id="collected-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">我的收藏</h3>
+                <button class="close-btn" data-modal="collected-modal">&times;</button>
+            </div>
+            <ul class="game-list" id="collected-list"></ul>
+        </div>
+    </div>
+    
+    <!-- 点赞游戏模态框 -->
+    <div class="modal" id="liked-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">我的点赞</h3>
+                <button class="close-btn" data-modal="liked-modal">&times;</button>
+            </div>
+            <ul class="game-list" id="liked-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        // 游戏数据
+        const games = [
+            { id: 1, name: "数字消消乐", src: "game1.html" },
+            { id: 2, name: "记忆翻牌", src: "game2.html" },
+            { id: 3, name: "贪吃蛇", src: "game3.html" },
+            { id: 4, name: "打砖块", src: "game4.html" },
+            { id: 5, name: "井字棋", src: "game5.html" },
+            { id: 6, name: "俄罗斯方块", src: "game6.html" },
+            { id: 7, name: "2048经典版", src: "game7.html" }
+        ];
+        
+        let currentIndex = 0;
+        let startY = 0;
+        let isDragging = false;
+        let container = document.getElementById('container');
+        
+        // 初始化本地存储
+        function initLocalStorage() {
+            if (!localStorage.getItem('username')) {
+                const adjectives = ['快乐', '聪明', '勇敢', '幸运', '阳光', '可爱', '帅气', '美丽', '机智', '活泼'];
+                const nouns = ['小熊', '小兔', '小猫', '小狗', '小鸟', '小鱼', '小虎', '小龙', '小猴', '小猪'];
+                const username = adjectives[Math.floor(Math.random() * adjectives.length)] + 
+                                nouns[Math.floor(Math.random() * nouns.length)] + 
+                                Math.floor(Math.random() * 100);
+                localStorage.setItem('username', username);
+            }
+            
+            if (!localStorage.getItem('playedGames')) {
+                localStorage.setItem('playedGames', JSON.stringify([]));
+            }
+            
+            if (!localStorage.getItem('collectedGames')) {
+                localStorage.setItem('collectedGames', JSON.stringify([]));
+            }
+            
+            if (!localStorage.getItem('likedGames')) {
+                localStorage.setItem('likedGames', JSON.stringify([]));
+            }
+            
+            if (!localStorage.getItem('gameLikes')) {
+                const gameLikes = {};
+                games.forEach(game => {
+                    gameLikes[game.id] = Math.floor(Math.random() * 500) + 100;
+                });
+                localStorage.setItem('gameLikes', JSON.stringify(gameLikes));
+            }
+            
+            if (!localStorage.getItem('muted')) {
+                localStorage.setItem('muted', 'false');
+            }
+        }
+        
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('username').textContent = localStorage.getItem('username');
+            document.getElementById('played-count').textContent = JSON.parse(localStorage.getItem('playedGames')).length;
+            document.getElementById('collected-count').textContent = JSON.parse(localStorage.getItem('collectedGames')).length;
+            document.getElementById('liked-count').textContent = JSON.parse(localStorage.getItem('likedGames')).length;
+        }
+        
+        // 滑动到指定游戏
+        function slideTo(index) {
+            currentIndex = index;
+            container.style.transform = `translateY(-${index * 100}vh)`;
+            
+            // 记录已玩游戏
+            const gameId = games[index].id;
+            const playedGames = JSON.parse(localStorage.getItem('playedGames'));
+            if (!playedGames.includes(gameId)) {
+                playedGames.push(gameId);
+                localStorage.setItem('playedGames', JSON.stringify(playedGames));
+                updateStats();
+            }
+            
+            // 通知iframe当前游戏被激活
+            const iframes = document.querySelectorAll('.game-iframe');
+            iframes.forEach((iframe, i) => {
+                if (i === index) {
+                    iframe.contentWindow.postMessage({ type: 'activate', muted: localStorage.getItem('muted') === 'true' }, '*');
+                } else {
+                    iframe.contentWindow.postMessage({ type: 'deactivate' }, '*');
+                }
+            });
+        }
+        
+        // 触摸事件处理
+        container.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+            isDragging = true;
+        });
+        
+        container.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+        }, { passive: false });
+        
+        container.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            const endY = e.changedTouches[0].clientY;
+            const diffY = startY - endY;
+            
+            if (Math.abs(diffY) > 50) {
+                if (diffY > 0) {
+                    // 向上滑动，下一个游戏
+                    slideTo((currentIndex + 1) % games.length);
+                } else {
+                    // 向下滑动，上一个游戏
+                    slideTo((currentIndex - 1 + games.length) % games.length);
+                }
+            }
+        });
+        
+        // 鼠标滚轮事件
+        let wheelTimeout;
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            
+            clearTimeout(wheelTimeout);
+            wheelTimeout = setTimeout(() => {
+                if (e.deltaY > 0) {
+                    slideTo((currentIndex + 1) % games.length);
+                } else {
+                    slideTo((currentIndex - 1 + games.length) % games.length);
+                }
+            }, 50);
+        }, { passive: false });
+        
+        // 导航按钮
+        document.getElementById('up-btn').addEventListener('click', () => {
+            slideTo((currentIndex - 1 + games.length) % games.length);
+        });
+        
+        document.getElementById('down-btn').addEventListener('click', () => {
+            slideTo((currentIndex + 1) % games.length);
+        });
+        
+        // 模态框处理
+        function showModal(modalId) {
+            document.getElementById(modalId).style.display = 'flex';
+            renderGameList(modalId);
+        }
+        
+        function hideModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        
+        function renderGameList(modalId) {
+            let listId, storageKey;
+            
+            if (modalId === 'played-modal') {
+                listId = 'played-list';
+                storageKey = 'playedGames';
+            } else if (modalId === 'collected-modal') {
+                listId = 'collected-list';
+                storageKey = 'collectedGames';
+            } else if (modalId === 'liked-modal') {
+                listId = 'liked-list';
+                storageKey = 'likedGames';
+            }
+            
+            const listElement = document.getElementById(listId);
+            const gameIds = JSON.parse(localStorage.getItem(storageKey));
+            
+            if (gameIds.length === 0) {
+                listElement.innerHTML = '<li class="empty-state">暂无数据</li>';
+                return;
+            }
+            
+            listElement.innerHTML = '';
+            gameIds.forEach(gameId => {
+                const game = games.find(g => g.id === gameId);
+                if (game) {
+                    const li = document.createElement('li');
+                    li.className = 'game-list-item';
+                    li.innerHTML = `
+                        <span class="game-name">${game.name}</span>
+                        <button class="remove-btn" data-game-id="${gameId}" data-storage-key="${storageKey}">
+                            ${storageKey === 'playedGames' ? '删除' : '取消'}
+                        </button>
+                    `;
+                    
+                    li.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('remove-btn')) {
+                            hideModal(modalId);
+                            slideTo(games.findIndex(g => g.id === gameId));
+                        }
+                    });
+                    
+                    listElement.appendChild(li);
+                }
+            });
+        }
+        
+        // 删除/取消按钮事件
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-btn')) {
+                const gameId = parseInt(e.target.dataset.gameId);
+                const storageKey = e.target.dataset.storageKey;
+                let items = JSON.parse(localStorage.getItem(storageKey));
+                items = items.filter(id => id !== gameId);
+                localStorage.setItem(storageKey, JSON.stringify(items));
+                updateStats();
+                
+                const modalId = storageKey === 'playedGames' ? 'played-modal' : 
+                               storageKey === 'collectedGames' ? 'collected-modal' : 'liked-modal';
+                renderGameList(modalId);
+                
+                // 通知iframe更新状态
+                const iframes = document.querySelectorAll('.game-iframe');
+                iframes.forEach(iframe => {
+                    if (parseInt(iframe.dataset.gameId) === gameId) {
+                        iframe.contentWindow.postMessage({ 
+                            type: 'updateStatus', 
+                            collected: JSON.parse(localStorage.getItem('collectedGames')).includes(gameId),
+                            liked: JSON.parse(localStorage.getItem('likedGames')).includes(gameId)
+                        }, '*');
+                    }
+                });
+            }
+        });
+        
+        // 模态框关闭按钮
+        document.querySelectorAll('.close-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                hideModal(btn.dataset.modal);
+            });
+        });
+        
+        // 点击模态框背景关闭
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    hideModal(modal.id);
+                }
+            });
+        });
+        
+        // 统计按钮点击
+        document.getElementById('played-btn').addEventListener('click', () => showModal('played-modal'));
+        document.getElementById('collected-btn').addEventListener('click', () => showModal('collected-modal'));
+        document.getElementById('liked-btn').addEventListener('click', () => showModal('liked-modal'));
+        
+        // 接收来自iframe的消息
+        window.addEventListener('message', (e) => {
+            const data = e.data;
+            
+            if (data.type === 'like') {
+                const gameId = data.gameId;
+                let likedGames = JSON.parse(localStorage.getItem('likedGames'));
+                let gameLikes = JSON.parse(localStorage.getItem('gameLikes'));
+                
+                if (likedGames.includes(gameId)) {
+                    // 取消点赞
+                    likedGames = likedGames.filter(id => id !== gameId);
+                    gameLikes[gameId] = Math.max(0, gameLikes[gameId] - 1);
+                } else {
+                    // 点赞
+                    likedGames.push(gameId);
+                    gameLikes[gameId] = Math.min(999, gameLikes[gameId] + 1);
+                }
+                
+                localStorage.setItem('likedGames', JSON.stringify(likedGames));
+                localStorage.setItem('gameLikes', JSON.stringify(gameLikes));
+                updateStats();
+                
+                // 回复iframe
+                e.source.postMessage({
+                    type: 'likeResponse',
+                    liked: likedGames.includes(gameId),
+                    likeCount: gameLikes[gameId]
+                }, '*');
+            } else if (data.type === 'collect') {
+                const gameId = data.gameId;
+                let collectedGames = JSON.parse(localStorage.getItem('collectedGames'));
+                
+                if (collectedGames.includes(gameId)) {
+                    // 取消收藏
+                    collectedGames = collectedGames.filter(id => id !== gameId);
+                } else {
+                    // 收藏
+                    collectedGames.push(gameId);
+                }
+                
+                localStorage.setItem('collectedGames', JSON.stringify(collectedGames));
+                updateStats();
+                
+                // 回复iframe
+                e.source.postMessage({
+                    type: 'collectResponse',
+                    collected: collectedGames.includes(gameId)
+                }, '*');
+            } else if (data.type === 'toggleMute') {
+                const muted = data.muted;
+                localStorage.setItem('muted', muted.toString());
+                
+                // 通知所有iframe
+                const iframes = document.querySelectorAll('.game-iframe');
+                iframes.forEach(iframe => {
+                    iframe.contentWindow.postMessage({ type: 'muteChanged', muted: muted }, '*');
+                });
+            } else if (data.type === 'requestStatus') {
+                const gameId = data.gameId;
+                e.source.postMessage({
+                    type: 'statusResponse',
+                    collected: JSON.parse(localStorage.getItem('collectedGames')).includes(gameId),
+                    liked: JSON.parse(localStorage.getItem('likedGames')).includes(gameId),
+                    likeCount: JSON.parse(localStorage.getItem('gameLikes'))[gameId] || 0,
+                    muted: localStorage.getItem('muted') === 'true'
+                }, '*');
+            }
+        });
+        
+        // 初始化
+        initLocalStorage();
+        updateStats();
+        slideTo(0);
+    </script>
+</body>
+</html>
