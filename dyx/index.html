@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>游戏流·带收藏</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+    .swiper { width: 100%; height: 100%; }
+    .game-box { position: relative; width: 100%; height: 100%; }
+    .game-box iframe { width: 100%; height: 100%; border: none; }
+
+    /* 按钮区域 */
+    .actions {
+      position: absolute; right: 12px; bottom: 80px; display: flex; flex-direction: column; gap: 24px; z-index: 10;
+    }
+    .btn {
+      width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center; font-size: 24px;
+      cursor: pointer; user-select: none; transition: 0.2s;
+    }
+    .btn.liked { color: #ff4d4f; }
+    .btn.collected { color: #ffc107; }
+  </style>
+</head>
+<body>
+  <div class="swiper">
+    <div class="swiper-wrapper" id="game-list">
+      <!-- 示例游戏列表，每个游戏一个 slide -->
+      <div class="swiper-slide">
+        <div class="game-box" data-game-id="snake">
+          <iframe src="https://playsnake.org/embed"></iframe>
+          <div class="actions">
+            <div class="btn like-btn" data-game-id="snake">❤️</div>
+            <div class="btn collect-btn" data-game-id="snake">⭐</div>
+          </div>
+        </div>
+      </div>
+      <div class="swiper-slide">
+        <div class="game-box" data-game-id="2048">
+          <iframe src="https://play2048.co/embed"></iframe>
+          <div class="actions">
+            <div class="btn like-btn" data-game-id="2048">❤️</div>
+            <div class="btn collect-btn" data-game-id="2048">⭐</div>
+          </div>
+        </div>
+      </div>
+      <!-- 想加更多游戏，继续复制上面的 slide 块，改 game-id 和 iframe src 即可 -->
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+  <script>
+    // ---------- localStorage 工具 ----------
+    const LIKE_PREFIX = 'like_';
+    const FAVORITES_KEY = 'favorites';
+
+    function isLiked(gameId) {
+      return localStorage.getItem(LIKE_PREFIX + gameId) === 'true';
+    }
+
+    function toggleLike(gameId) {
+      const newVal = !isLiked(gameId);
+      localStorage.setItem(LIKE_PREFIX + gameId, newVal);
+      return newVal;
+    }
+
+    function getFavorites() {
+      try {
+        return JSON.parse(localStorage.getItem(FAVORITES_KEY)) || [];
+      } catch(e) { return []; }
+    }
+
+    function saveFavorites(list) {
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(list));
+    }
+
+    function isCollected(gameId) {
+      return getFavorites().includes(gameId);
+    }
+
+    function toggleCollect(gameId) {
+      const favs = getFavorites();
+      const idx = favs.indexOf(gameId);
+      if (idx > -1) {
+        favs.splice(idx, 1);
+        saveFavorites(favs);
+        return false;
+      } else {
+        favs.push(gameId);
+        saveFavorites(favs);
+        return true;
+      }
+    }
+
+    // ---------- 更新按钮状态 ----------
+    function updateButtons(gameId) {
+      const slide = document.querySelector(`.game-box[data-game-id="${gameId}"]`);
+      if (!slide) return;
+      const likeBtn = slide.querySelector('.like-btn');
+      const collectBtn = slide.querySelector('.collect-btn');
+      if (likeBtn) likeBtn.classList.toggle('liked', isLiked(gameId));
+      if (collectBtn) collectBtn.classList.toggle('collected', isCollected(gameId));
+    }
+
+    // 监听所有按钮点击
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('.like-btn, .collect-btn');
+      if (!btn) return;
+      const gameId = btn.dataset.gameId;
+      if (btn.classList.contains('like-btn')) {
+        toggleLike(gameId);
+      } else {
+        toggleCollect(gameId);
+      }
+      updateButtons(gameId);
+    });
+
+    // 初始化 swiper 时，刷新当前可见按钮状态
+    const swiper = new Swiper('.swiper', {
+      direction: 'vertical',
+      mousewheel: true,
+      on: {
+        init: function() {
+          const activeSlide = this.slides[this.activeIndex];
+          const box = activeSlide.querySelector('.game-box');
+          if (box) updateButtons(box.dataset.gameId);
+        },
+        slideChange: function() {
+          const activeSlide = this.slides[this.activeIndex];
+          const box = activeSlide.querySelector('.game-box');
+          if (box) updateButtons(box.dataset.gameId);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
