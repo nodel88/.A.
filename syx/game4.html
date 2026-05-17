@@ -6,7 +6,7 @@
 <title>2048</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#faf8ef;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui}
+body{background:#faf8ef;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui;padding-bottom:48px}
 .info{text-align:center;margin-bottom:8px}
 .title{font-size:32px;font-weight:900;color:#776e65}
 .desc{font-size:13px;color:#a39480}
@@ -47,7 +47,7 @@ body{background:#faf8ef;display:flex;flex-direction:column;justify-content:cente
 </div>
 <script>
 const GAME_ID='2048';
-let audioCtx=null, musicInterval=null, isMuted=false;
+let audioCtx=null, musicInterval=null, isMuted=false, isActive=true;
 function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
 function playSound(type){
   if(!audioCtx||isMuted) return;
@@ -58,11 +58,11 @@ function playSound(type){
   else if(type==='win'){ osc.type='triangle'; osc.frequency.setValueAtTime(523,audioCtx.currentTime); gain.gain.setValueAtTime(0.2,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.8); osc.start(); osc.stop(audioCtx.currentTime+0.8); }
 }
 function startMusic(){
-  if(musicInterval||isMuted) return;
+  if(musicInterval||isMuted||!isActive) return;
   const notes=[262,330,392,523,392,330,262,196];
   let i=0;
   musicInterval=setInterval(()=>{
-    if(!audioCtx||isMuted) return;
+    if(!audioCtx||isMuted||!isActive) return;
     const o=audioCtx.createOscillator(), g=audioCtx.createGain();
     o.type='sine'; o.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
     g.gain.setValueAtTime(0.03,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3);
@@ -73,26 +73,22 @@ function startMusic(){
 function stopMusic(){ if(musicInterval){ clearInterval(musicInterval); musicInterval=null; } }
 function playFireworkSound(){
   if(!audioCtx||isMuted) return;
-  const bufferSize = audioCtx.sampleRate * 0.5;
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i/(audioCtx.sampleRate*0.1));
-  const source = audioCtx.createBufferSource();
-  source.buffer = buffer;
-  const gain = audioCtx.createGain();
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-  source.connect(gain); gain.connect(audioCtx.destination);
-  source.start(); source.stop(audioCtx.currentTime + 0.5);
+  const bufferSize=audioCtx.sampleRate*0.5;
+  const buffer=audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+  const data=buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(audioCtx.sampleRate*0.1));
+  const source=audioCtx.createBufferSource(); source.buffer=buffer;
+  const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0.5,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.5);
+  source.connect(gain); gain.connect(audioCtx.destination); source.start(); source.stop(audioCtx.currentTime+0.5);
 }
 function toggleMute(){
-  isMuted = !isMuted;
-  document.getElementById('muteBtn').textContent = isMuted ? '🔇 已静音' : '🔊 静音';
-  if (isMuted) { stopMusic(); } else { startMusic(); }
+  isMuted=!isMuted;
+  document.getElementById('muteBtn').textContent=isMuted?'🔇 已静音':'🔊 静音';
+  if(isMuted){ stopMusic(); } else if(isActive){ startMusic(); }
 }
-document.getElementById('muteBtn').addEventListener('click', toggleMute);
-document.querySelector('.nav-up').addEventListener('click', ()=> window.parent.postMessage({type:'nav',direction:'up'},'*'));
-document.querySelector('.nav-down').addEventListener('click', ()=> window.parent.postMessage({type:'nav',direction:'down'},'*'));
+document.getElementById('muteBtn').addEventListener('click',toggleMute);
+document.querySelector('.nav-up').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'up'},'*'));
+document.querySelector('.nav-down').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'down'},'*'));
 
 function updateSocial(){
   const likes=parseInt(localStorage.getItem('like_'+GAME_ID)||'0');
@@ -114,7 +110,14 @@ document.getElementById('collectBtn').addEventListener('click',()=>{
   localStorage.setItem('favs',JSON.stringify(favs)); updateSocial();
 });
 updateSocial();
-function notifyPlayed(){ if(window.parent) window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
+function notifyPlayed(){ window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
+
+window.addEventListener('message',(e)=>{
+  if(e.data&&e.data.type==='setActive'){
+    isActive=e.data.active;
+    if(isActive&&!isMuted){ startMusic(); } else{ stopMusic(); }
+  }
+});
 
 let grid, winTriggered=false;
 function init(){ grid=Array(4).fill().map(()=>Array(4).fill(0)); winTriggered=false; addRandom(); addRandom(); draw(); stopMusic(); startMusic(); const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove(); notifyPlayed(); }
@@ -131,9 +134,7 @@ function showVictory(){
     p.animate([{transform:'translate(-50%,-50%) scale(0)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(1)`,opacity:0}],{duration:800,delay:Math.random()*300,fill:'forwards'});
   }
   const txt=document.createElement('div'); txt.className='victory-text'; txt.textContent='🎉 恭喜成功！';
-  ov.appendChild(txt);
-  document.body.appendChild(ov);
-  playFireworkSound();
+  ov.appendChild(txt); document.body.appendChild(ov); playFireworkSound();
   setTimeout(()=>ov.remove(),3000);
 }
 function move(dir){
