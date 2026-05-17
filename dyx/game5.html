@@ -1,0 +1,31 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>
+body{margin:0;display:flex;justify-content:center;align-items:center;height:100vh;background:#222;}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:90vw;}
+.card{aspect-ratio:1;background:#444;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;border-radius:6px;}
+.card.flipped{background:#fff;}
+</style></head><body><div class="grid" id="grid"></div><script>
+const emojis=['🍎','🍊','🍋','🍇','🍓','🍒','🥝','🍑'];
+let cards=[...emojis,...emojis].sort(()=>Math.random()-0.5);
+let flipped=[],matched=[];
+function draw(){
+  const g=document.getElementById('grid');
+  g.innerHTML='';
+  cards.forEach((v,i)=>{
+    const d=document.createElement('div');
+    d.className='card'+(flipped.includes(i)||matched.includes(i)?' flipped':'');
+    d.textContent=(flipped.includes(i)||matched.includes(i))?v:'?';
+    d.onclick=()=>flip(i);
+    g.appendChild(d);
+  });
+}
+function flip(i){
+  if(flipped.length===2||flipped.includes(i)||matched.includes(i))return;
+  flipped.push(i);draw();
+  if(flipped.length===2){
+    const [a,b]=flipped;
+    if(cards[a]===cards[b]){matched.push(a,b);flipped=[];draw();}
+    else setTimeout(()=>{flipped=[];draw();},800);
+  }
+}
+draw();
+</script></body></html>

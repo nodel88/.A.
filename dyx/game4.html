@@ -1,0 +1,28 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>
+body{margin:0;display:flex;justify-content:center;align-items:center;height:100vh;background:#70c5ce;}
+canvas{background:#70c5ce;display:block;max-width:100%;max-height:100%;}
+</style></head><body><canvas id="c" width="300" height="400"></canvas><script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+let bird={x:60,y:200,vy:0},pipes=[],score=0,gameover=false;
+function addPipe(){pipes.push({x:300,y:Math.random()*200+50});}
+addPipe();setInterval(addPipe,2000);
+function loop(){
+  ctx.clearRect(0,0,300,400);
+  bird.vy+=0.5;bird.y+=bird.vy;
+  if(bird.y<0||bird.y>380)gameover=true;
+  ctx.fillStyle='#ff0';ctx.fillRect(bird.x,bird.y,20,20);
+  pipes.forEach(p=>{
+    p.x-=1.5;
+    ctx.fillStyle='green';ctx.fillRect(p.x,0,30,p.y);ctx.fillRect(p.x,p.y+100,30,400-p.y-100);
+    if(bird.x+20>p.x&&bird.x<p.x+30&&(bird.y<p.y||bird.y+20>p.y+100))gameover=true;
+    if(p.x+30<bird.x&&!p.scored){p.scored=true;score++;}
+  });
+  pipes=pipes.filter(p=>p.x>-30);
+  if(gameover){bird={x:60,y:200,vy:0};pipes=[];score=0;gameover=false;}
+  ctx.fillStyle='#fff';ctx.font='20px sans-serif';ctx.fillText('得分:'+score,5,25);
+  requestAnimationFrame(loop);
+}
+document.addEventListener('keydown',()=>bird.vy=-5);
+c.addEventListener('touchstart',()=>bird.vy=-5);
+loop();
+</script></body></html>

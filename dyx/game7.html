@@ -1,0 +1,19 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>
+body{margin:0;display:flex;justify-content:center;align-items:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;flex-direction:column;}
+input,button{font-size:18px;padding:10px;margin:5px;}
+</style></head><body>
+<h2>猜数字 (1-100)</h2>
+<input type="number" id="guess" min="1" max="100"><button onclick="check()">猜</button>
+<p id="hint"></p><p id="count"></p>
+<script>
+let target=Math.floor(Math.random()*100)+1,count=0;
+function check(){
+  let g=parseInt(document.getElementById('guess').value);
+  if(!g)return;
+  count++;
+  if(g===target){document.getElementById('hint').textContent='🎉 答对了！';document.getElementById('count').textContent='用了'+count+'次';target=Math.floor(Math.random()*100)+1;count=0;}
+  else if(g<target){document.getElementById('hint').textContent='太小了';}
+  else{document.getElementById('hint').textContent='太大了';}
+  document.getElementById('count').textContent='已猜'+count+'次';
+}
+</script></body></html>
