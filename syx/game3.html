@@ -6,8 +6,8 @@
 <title>Flappy Bird</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#faf8ef;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui}
-canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+body{background:#faf8ef;padding-bottom:48px;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui}
+canvas{position:absolute;top:0;left:0;width:100%;height:calc(100% - 48px)}
 .info{position:fixed;top:16px;left:16px;z-index:2;pointer-events:none}
 .title{color:#776e65;font-size:28px;font-weight:900}
 .desc{color:#a39480;font-size:12px;margin-top:2px}
@@ -47,7 +47,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 </div>
 <script>
 const GAME_ID='flappy';
-let audioCtx=null, musicInterval=null, isMuted=false;
+let audioCtx=null, musicInterval=null, isMuted=false, isActive=true;
 function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
 function playSound(type){
   if(!audioCtx||isMuted) return;
@@ -58,11 +58,11 @@ function playSound(type){
   else if(type==='point'){ osc.frequency.setValueAtTime(700,audioCtx.currentTime); gain.gain.setValueAtTime(0.08,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2); osc.start(); osc.stop(audioCtx.currentTime+0.2); }
 }
 function startMusic(){
-  if(musicInterval||isMuted) return;
+  if(musicInterval||isMuted||!isActive) return;
   const notes=[440,494,523,587,523,494,440,392];
   let i=0;
   musicInterval=setInterval(()=>{
-    if(!audioCtx||isMuted) return;
+    if(!audioCtx||isMuted||!isActive) return;
     const o=audioCtx.createOscillator(), g=audioCtx.createGain();
     o.type='sine'; o.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
     g.gain.setValueAtTime(0.03,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3);
@@ -73,26 +73,22 @@ function startMusic(){
 function stopMusic(){ if(musicInterval){ clearInterval(musicInterval); musicInterval=null; } }
 function playFireworkSound(){
   if(!audioCtx||isMuted) return;
-  const bufferSize = audioCtx.sampleRate * 0.5;
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i/(audioCtx.sampleRate*0.1));
-  const source = audioCtx.createBufferSource();
-  source.buffer = buffer;
-  const gain = audioCtx.createGain();
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-  source.connect(gain); gain.connect(audioCtx.destination);
-  source.start(); source.stop(audioCtx.currentTime + 0.5);
+  const bufferSize=audioCtx.sampleRate*0.5;
+  const buffer=audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+  const data=buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(audioCtx.sampleRate*0.1));
+  const source=audioCtx.createBufferSource(); source.buffer=buffer;
+  const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0.5,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.5);
+  source.connect(gain); gain.connect(audioCtx.destination); source.start(); source.stop(audioCtx.currentTime+0.5);
 }
 function toggleMute(){
-  isMuted = !isMuted;
-  document.getElementById('muteBtn').textContent = isMuted ? '🔇 已静音' : '🔊 静音';
-  if (isMuted) { stopMusic(); } else { startMusic(); }
+  isMuted=!isMuted;
+  document.getElementById('muteBtn').textContent=isMuted?'🔇 已静音':'🔊 静音';
+  if(isMuted){ stopMusic(); } else if(isActive){ startMusic(); }
 }
-document.getElementById('muteBtn').addEventListener('click', toggleMute);
-document.querySelector('.nav-up').addEventListener('click', ()=> window.parent.postMessage({type:'nav',direction:'up'},'*'));
-document.querySelector('.nav-down').addEventListener('click', ()=> window.parent.postMessage({type:'nav',direction:'down'},'*'));
+document.getElementById('muteBtn').addEventListener('click',toggleMute);
+document.querySelector('.nav-up').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'up'},'*'));
+document.querySelector('.nav-down').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'down'},'*'));
 
 function updateSocial(){
   const likes=parseInt(localStorage.getItem('like_'+GAME_ID)||'0');
@@ -114,7 +110,14 @@ document.getElementById('collectBtn').addEventListener('click',()=>{
   localStorage.setItem('favs',JSON.stringify(favs)); updateSocial();
 });
 updateSocial();
-function notifyPlayed(){ if(window.parent) window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
+function notifyPlayed(){ window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
+
+window.addEventListener('message',(e)=>{
+  if(e.data&&e.data.type==='setActive'){
+    isActive=e.data.active;
+    if(isActive&&!isMuted){ startMusic(); } else{ stopMusic(); }
+  }
+});
 
 const c=document.getElementById('c'),ctx=c.getContext('2d');
 const W=300,H=400;
@@ -134,14 +137,11 @@ function showVictory(){
     p.animate([{transform:'translate(-50%,-50%) scale(0)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(1)`,opacity:0}],{duration:800,delay:Math.random()*300,fill:'forwards'});
   }
   const txt=document.createElement('div'); txt.className='victory-text'; txt.textContent='🎉 恭喜成功！';
-  ov.appendChild(txt);
-  document.body.appendChild(ov);
-  playFireworkSound();
+  ov.appendChild(txt); document.body.appendChild(ov); playFireworkSound();
   setTimeout(()=>ov.remove(),3000);
 }
 function draw(){
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#faf8ef'; ctx.fillRect(0,0,W,H);
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#faf8ef'; ctx.fillRect(0,0,W,H);
   if(!gameover){
     bird.vy+=0.5; bird.y+=bird.vy;
     if(bird.y<0 || bird.y>H-20){ gameover=true; playSound('hit'); stopMusic(); }
