@@ -15,13 +15,13 @@ input{padding:12px;font-size:5vmin;width:60%;max-width:300px;text-align:center;b
 button{padding:12px 24px;font-size:5vmin;border-radius:12px;border:none;font-weight:700;cursor:pointer;transition:0.1s}
 #checkBtn{background:#8f7a66;color:#fff}
 #restartBtn{background:#cdc1b4;color:#fff}
-.social-actions{display:flex;gap:16px;margin-left:8px}
-.social-btn{width:44px;height:44px;border-radius:50%;background:#8f7a66;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#fff;position:relative;transition:0.2s}
-.social-btn.liked{background:#f65e3b}
-.social-btn.collected{background:#e6a817}
-.social-btn .count{position:absolute;bottom:-8px;font-size:10px;font-weight:700;background:#776e65;color:#fff;padding:2px 6px;border-radius:10px}
-.nav-btns{display:flex;gap:4px}
-.nav-btns button{width:36px;height:36px;border-radius:50%;background:#cdc1b4;color:#fff;border:none;font-size:18px;cursor:pointer}
+.side-btns{position:fixed;right:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:3;align-items:center}
+.side-btns button{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.85);border:1px solid #ccc;color:#776e65;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.nav-btns{display:flex;flex-direction:column;gap:4px}
+.social-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#776e65;border:1px solid rgba(0,0,0,0.1);transition:0.15s;position:relative}
+.social-btn.liked{color:#ff4d4f;background:rgba(255,77,79,0.1)}
+.social-btn.collected{color:#e6a817;background:rgba(230,168,23,0.1)}
+.social-btn .count{position:absolute;bottom:-8px;font-size:10px;font-weight:700;background:#fff;padding:2px 6px;border-radius:10px}
 #hint{font-size:5vmin;margin-top:8px;color:#8f7a66}
 #count{font-size:4vmin;color:#a39480}
 .victory-overlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:999;pointer-events:none;background:rgba(0,0,0,0.2)}
@@ -36,23 +36,23 @@ button{padding:12px 24px;font-size:5vmin;border-radius:12px;border:none;font-wei
 </div>
 <input type="number" id="guess" min="1" max="100" placeholder="输入数字">
 <div class="btns">
-  <button id="muteBtn">🔊 静音</button>
   <button id="checkBtn">🎯 猜</button>
-  <button id="restartBtn">↺ 重新开始</button>
-  <div class="social-actions">
-    <div class="nav-btns">
-      <button class="nav-up">▲</button>
-      <button class="nav-down">▼</button>
-    </div>
-    <div class="social-btn like-btn" id="likeBtn">❤️<span class="count" id="likeCount">0</span></div>
-    <div class="social-btn collect-btn" id="collectBtn">⭐</div>
-  </div>
 </div>
 <p id="hint"></p>
 <p id="count"></p>
+<div class="side-btns">
+  <button id="muteBtn">🔊</button>
+  <button id="restartBtn">↺</button>
+  <div class="nav-btns">
+    <button class="nav-up">▲</button>
+    <button class="nav-down">▼</button>
+  </div>
+  <div class="social-btn like-btn" id="likeBtn">❤️<span class="count" id="likeCount">0</span></div>
+  <div class="social-btn collect-btn" id="collectBtn">⭐</div>
+</div>
 <script>
 const GAME_ID='guess';
-let audioCtx=null, musicInterval=null, isMuted=false, isActive=true;
+let audioCtx=null, isMuted=false;
 function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
 function playSound(type){
   if(!audioCtx||isMuted) return;
@@ -62,20 +62,6 @@ function playSound(type){
   else if(type==='win'){ osc.type='triangle'; osc.frequency.setValueAtTime(523,audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(1047,audioCtx.currentTime+0.8); gain.gain.setValueAtTime(0.2,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.8); osc.start(); osc.stop(audioCtx.currentTime+0.8); }
   else if(type==='wrong'){ osc.frequency.setValueAtTime(200,audioCtx.currentTime); gain.gain.setValueAtTime(0.1,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3); osc.start(); osc.stop(audioCtx.currentTime+0.3); }
 }
-function startMusic(){
-  if(musicInterval||isMuted||!isActive) return;
-  const notes=[349,392,440,494,440,392,349,330];
-  let i=0;
-  musicInterval=setInterval(()=>{
-    if(!audioCtx||isMuted||!isActive) return;
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
-    g.gain.setValueAtTime(0.03,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.3);
-    i++;
-  },500);
-}
-function stopMusic(){ if(musicInterval){ clearInterval(musicInterval); musicInterval=null; } }
 function playFireworkSound(){
   if(!audioCtx||isMuted) return;
   const bufferSize=audioCtx.sampleRate*0.5;
@@ -88,8 +74,7 @@ function playFireworkSound(){
 }
 function toggleMute(){
   isMuted=!isMuted;
-  document.getElementById('muteBtn').textContent=isMuted?'🔇 已静音':'🔊 静音';
-  if(isMuted){ stopMusic(); } else if(isActive){ startMusic(); }
+  document.getElementById('muteBtn').textContent=isMuted?'🔇':'🔊';
 }
 document.getElementById('muteBtn').addEventListener('click',toggleMute);
 document.querySelector('.nav-up').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'up'},'*'));
@@ -117,19 +102,12 @@ document.getElementById('collectBtn').addEventListener('click',()=>{
 updateSocial();
 function notifyPlayed(){ window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
 
-window.addEventListener('message',(e)=>{
-  if(e.data&&e.data.type==='setActive'){
-    isActive=e.data.active;
-    if(isActive&&!isMuted){ startMusic(); } else{ stopMusic(); }
-  }
-});
-
 let target, count;
 function init(){
   target=Math.floor(Math.random()*100)+1; count=0;
   document.getElementById('hint').textContent=''; document.getElementById('count').textContent='';
   document.getElementById('guess').value='';
-  stopMusic(); startMusic(); const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove(); notifyPlayed();
+  const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove(); notifyPlayed();
 }
 function check(){
   initAudio();
@@ -138,7 +116,7 @@ function check(){
   if(g===target){
     document.getElementById('hint').textContent='🎉 答对了！';
     document.getElementById('count').textContent='用了 '+count+' 次';
-    stopMusic(); playSound('win'); showVictory(); setTimeout(init,3000);
+    playSound('win'); showVictory(); setTimeout(init,3000);
   }else{
     if(g<target) document.getElementById('hint').textContent='📈 太小了';
     else document.getElementById('hint').textContent='📉 太大了';

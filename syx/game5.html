@@ -13,15 +13,13 @@ body{background:#faf8ef;display:flex;flex-direction:column;justify-content:cente
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:90vmin;height:90vmin;max-width:500px;max-height:500px}
 .card{aspect-ratio:1;background:#cdc1b4;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:5vmin;cursor:pointer;transition:0.15s;color:#776e65}
 .card.flipped{background:#f2b179;color:#faf8ef}
-.controls{margin-top:12px;display:flex;gap:12px;align-items:center}
-.controls button{background:#8f7a66;color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer}
-.social-actions{display:flex;gap:16px;margin-left:12px}
-.social-btn{width:44px;height:44px;border-radius:50%;background:#8f7a66;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#fff;position:relative;transition:0.2s}
-.social-btn.liked{background:#f65e3b}
-.social-btn.collected{background:#e6a817}
-.social-btn .count{position:absolute;bottom:-8px;font-size:10px;font-weight:700;background:#776e65;color:#fff;padding:2px 6px;border-radius:10px}
-.nav-btns{display:flex;gap:4px}
-.nav-btns button{width:36px;height:36px;border-radius:50%;background:#8f7a66;color:#fff;border:none;font-size:18px;cursor:pointer}
+.side-btns{position:fixed;right:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:3;align-items:center}
+.side-btns button{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.85);border:1px solid #ccc;color:#776e65;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.nav-btns{display:flex;flex-direction:column;gap:4px}
+.social-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#776e65;border:1px solid rgba(0,0,0,0.1);transition:0.15s;position:relative}
+.social-btn.liked{color:#ff4d4f;background:rgba(255,77,79,0.1)}
+.social-btn.collected{color:#e6a817;background:rgba(230,168,23,0.1)}
+.social-btn .count{position:absolute;bottom:-8px;font-size:10px;font-weight:700;background:#fff;padding:2px 6px;border-radius:10px}
 .victory-overlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:999;pointer-events:none;background:rgba(0,0,0,0.2)}
 .victory-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:8vmin;font-weight:900;color:#fff;text-shadow:0 0 20px #ffd700;animation:blink 0.5s infinite alternate}
 @keyframes blink{from{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0.8;transform:translate(-50%,-50%) scale(1.05)}}
@@ -33,21 +31,19 @@ body{background:#faf8ef;display:flex;flex-direction:column;justify-content:cente
   <div class="desc">手机点击卡片 / 电脑鼠标点击翻开配对</div>
 </div>
 <div class="grid" id="grid"></div>
-<div class="controls">
-  <button id="muteBtn">🔊 静音</button>
-  <button id="restartBtn">↺ 重新开始</button>
-  <div class="social-actions">
-    <div class="nav-btns">
-      <button class="nav-up">▲</button>
-      <button class="nav-down">▼</button>
-    </div>
-    <div class="social-btn like-btn" id="likeBtn">❤️<span class="count" id="likeCount">0</span></div>
-    <div class="social-btn collect-btn" id="collectBtn">⭐</div>
+<div class="side-btns">
+  <button id="muteBtn">🔊</button>
+  <button id="restartBtn">↺</button>
+  <div class="nav-btns">
+    <button class="nav-up">▲</button>
+    <button class="nav-down">▼</button>
   </div>
+  <div class="social-btn like-btn" id="likeBtn">❤️<span class="count" id="likeCount">0</span></div>
+  <div class="social-btn collect-btn" id="collectBtn">⭐</div>
 </div>
 <script>
 const GAME_ID='memory';
-let audioCtx=null, musicInterval=null, isMuted=false, isActive=true;
+let audioCtx=null, isMuted=false;
 function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
 function playSound(type){
   if(!audioCtx||isMuted) return;
@@ -57,20 +53,6 @@ function playSound(type){
   else if(type==='match'){ osc.frequency.setValueAtTime(800,audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(1200,audioCtx.currentTime+0.2); gain.gain.setValueAtTime(0.1,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2); osc.start(); osc.stop(audioCtx.currentTime+0.2); }
   else if(type==='wrong'){ osc.frequency.setValueAtTime(200,audioCtx.currentTime); gain.gain.setValueAtTime(0.1,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3); osc.start(); osc.stop(audioCtx.currentTime+0.3); }
 }
-function startMusic(){
-  if(musicInterval||isMuted||!isActive) return;
-  const notes=[494,440,392,349,330,294,262,294];
-  let i=0;
-  musicInterval=setInterval(()=>{
-    if(!audioCtx||isMuted||!isActive) return;
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
-    g.gain.setValueAtTime(0.03,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.3);
-    i++;
-  },500);
-}
-function stopMusic(){ if(musicInterval){ clearInterval(musicInterval); musicInterval=null; } }
 function playFireworkSound(){
   if(!audioCtx||isMuted) return;
   const bufferSize=audioCtx.sampleRate*0.5;
@@ -83,8 +65,7 @@ function playFireworkSound(){
 }
 function toggleMute(){
   isMuted=!isMuted;
-  document.getElementById('muteBtn').textContent=isMuted?'🔇 已静音':'🔊 静音';
-  if(isMuted){ stopMusic(); } else if(isActive){ startMusic(); }
+  document.getElementById('muteBtn').textContent=isMuted?'🔇':'🔊';
 }
 document.getElementById('muteBtn').addEventListener('click',toggleMute);
 document.querySelector('.nav-up').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'up'},'*'));
@@ -112,19 +93,12 @@ document.getElementById('collectBtn').addEventListener('click',()=>{
 updateSocial();
 function notifyPlayed(){ window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
 
-window.addEventListener('message',(e)=>{
-  if(e.data&&e.data.type==='setActive'){
-    isActive=e.data.active;
-    if(isActive&&!isMuted){ startMusic(); } else{ stopMusic(); }
-  }
-});
-
 const emojis=['🍎','🍊','🍋','🍇','🍓','🍒','🥝','🍑'];
 let cards, flipped=[], matched=[], lock=false;
 function init(){
   cards=[...emojis,...emojis].sort(()=>Math.random()-0.5);
   flipped=[]; matched=[]; lock=false;
-  stopMusic(); startMusic(); const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove(); notifyPlayed();
+  const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove(); notifyPlayed();
   draw();
 }
 function draw(){ const g=document.getElementById('grid'); g.innerHTML=''; cards.forEach((v,i)=>{ const d=document.createElement('div'); d.className='card'+(flipped.includes(i)||matched.includes(i)?' flipped':''); d.textContent=(flipped.includes(i)||matched.includes(i))?v:'?'; d.onclick=()=>flip(i); g.appendChild(d); }); }
@@ -137,7 +111,7 @@ function flip(i){
     const [a,b]=flipped;
     if(cards[a]===cards[b]){
       matched.push(a,b); flipped=[]; lock=false; draw(); playSound('match');
-      if(matched.length===cards.length){ stopMusic(); showVictory(); setTimeout(init,3000); }
+      if(matched.length===cards.length){ showVictory(); setTimeout(init,3000); }
     }else{ setTimeout(()=>{ flipped=[]; lock=false; draw(); playSound('wrong'); },800); }
   }
 }
