@@ -112,14 +112,12 @@
       container.appendChild(slide);
     });
 
-    // 循环滚动（从最后滑到底部回到第一个）
     container.addEventListener('scroll', () => {
       if (container.scrollTop + container.clientHeight >= container.scrollHeight - 5) {
         container.scrollTo({ top: 0, behavior: 'instant' });
       }
     });
 
-    // 监听游戏消息（已玩 / 导航）
     window.addEventListener('message', (e) => {
       if (!e.data || !e.data.type) return;
       if (e.data.type === 'played' && e.data.gameId) {
@@ -137,20 +135,11 @@
       }
     });
 
-    // 可见性检测 → 发送激活消息控制音乐
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        entry.target.dataset.visible = entry.isIntersecting ? 'true' : 'false';
-        const iframe = entry.target.querySelector('iframe');
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage({ type: 'setActive', active: entry.isIntersecting }, '*');
-        }
-        if (entry.isIntersecting) updateUI();
-      });
+      entries.forEach(entry => { entry.target.dataset.visible = entry.isIntersecting ? 'true' : 'false'; if (entry.isIntersecting) updateUI(); });
     }, { threshold: 0.6 });
     document.querySelectorAll('.slide').forEach(s => observer.observe(s));
 
-    // 弹出列表逻辑
     const overlay = document.getElementById('popupOverlay'), popupTitle = document.getElementById('popupTitle'), popupContent = document.getElementById('popupContent');
     function showPopup(type) {
       overlay.classList.add('active');
