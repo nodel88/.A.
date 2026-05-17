@@ -6,17 +6,16 @@
 <title>打砖块</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#faf8ef;padding-bottom:48px;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui}
-canvas{position:absolute;top:0;left:0;width:100%;height:calc(100% - 48px)}
-.info{position:fixed;top:16px;left:16px;z-index:2;pointer-events:none}
-.title{color:#776e65;font-size:28px;font-weight:900}
-.desc{color:#a39480;font-size:12px;margin-top:2px}
-.score{color:#776e65;font-size:24px;font-weight:700;margin-top:6px}
-.btns{position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:2}
-.btns button{background:rgba(238,228,218,0.9);color:#776e65;border:1px solid #ccc;border-radius:24px;padding:8px 16px;font-size:14px;cursor:pointer;font-weight:600}
-.social-actions{position:fixed;bottom:80px;right:12px;display:flex;flex-direction:column;gap:12px;z-index:3;align-items:center}
+body{background:#faf8ef;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui;padding-bottom:48px}
+.game-wrapper{position:relative;display:flex;flex-direction:column;align-items:center}
+canvas{background:#faf8ef;border:2px solid #cdc1b4;border-radius:8px;max-width:90vw;max-height:70vh}
+.info{text-align:center;margin-top:8px}
+.title{color:#776e65;font-size:24px;font-weight:900}
+.desc{color:#a39480;font-size:12px}
+.score{color:#776e65;font-size:20px;font-weight:700}
+.side-btns{position:fixed;right:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:3;align-items:center}
+.side-btns button{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.85);border:1px solid #ccc;color:#776e65;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .nav-btns{display:flex;flex-direction:column;gap:4px}
-.nav-btns button{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.8);border:1px solid #ccc;color:#776e65;font-size:18px;cursor:pointer}
 .social-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#776e65;border:1px solid rgba(0,0,0,0.1);transition:0.15s;position:relative}
 .social-btn.liked{color:#ff4d4f;background:rgba(255,77,79,0.1)}
 .social-btn.collected{color:#e6a817;background:rgba(230,168,23,0.1)}
@@ -27,18 +26,18 @@ canvas{position:absolute;top:0;left:0;width:100%;height:calc(100% - 48px)}
 </style>
 </head>
 <body>
-<canvas id="c" width="400" height="600"></canvas>
-<div class="info">
-  <div class="title">🧱 打砖块</div>
-  <div class="desc">手机滑动屏幕 / 电脑移动鼠标接球打砖</div>
-  <div class="score" id="scoreDisplay">得分 0</div>
+<div class="game-wrapper">
+  <canvas id="c" width="400" height="500"></canvas>
+  <div class="info">
+    <div class="title">🧱 打砖块</div>
+    <div class="desc">手机滑动屏幕 / 电脑移动鼠标接球打砖</div>
+    <div class="score" id="scoreDisplay">得分 0</div>
+  </div>
 </div>
-<div class="btns">
-  <button id="muteBtn">🔊 静音</button>
-  <button id="pauseBtn">⏯️ 暂停</button>
-  <button id="restartBtn">↺ 重新开始</button>
-</div>
-<div class="social-actions">
+<div class="side-btns">
+  <button id="muteBtn">🔊</button>
+  <button id="pauseBtn">⏯️</button>
+  <button id="restartBtn">↺</button>
   <div class="nav-btns">
     <button class="nav-up">▲</button>
     <button class="nav-down">▼</button>
@@ -48,7 +47,7 @@ canvas{position:absolute;top:0;left:0;width:100%;height:calc(100% - 48px)}
 </div>
 <script>
 const GAME_ID='breakout';
-let audioCtx=null, musicInterval=null, isMuted=false, isActive=true;
+let audioCtx=null, isMuted=false;
 function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
 function playSound(type){
   if(!audioCtx||isMuted) return;
@@ -58,20 +57,6 @@ function playSound(type){
   else if(type==='die'){ osc.frequency.setValueAtTime(300,audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(80,audioCtx.currentTime+0.4); gain.gain.setValueAtTime(0.2,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.4); osc.start(); osc.stop(audioCtx.currentTime+0.4); }
   else if(type==='win'){ osc.type='square'; osc.frequency.setValueAtTime(523,audioCtx.currentTime); gain.gain.setValueAtTime(0.15,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.5); osc.start(); osc.stop(audioCtx.currentTime+0.5); }
 }
-function startMusic(){
-  if(musicInterval||isMuted||!isActive) return;
-  const notes=[330,392,440,494,440,392,330,294];
-  let i=0;
-  musicInterval=setInterval(()=>{
-    if(!audioCtx||isMuted||!isActive) return;
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.type='triangle'; o.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
-    g.gain.setValueAtTime(0.03,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.3);
-    i++;
-  },500);
-}
-function stopMusic(){ if(musicInterval){ clearInterval(musicInterval); musicInterval=null; } }
 function playFireworkSound(){
   if(!audioCtx||isMuted) return;
   const bufferSize=audioCtx.sampleRate*0.5;
@@ -84,8 +69,7 @@ function playFireworkSound(){
 }
 function toggleMute(){
   isMuted=!isMuted;
-  document.getElementById('muteBtn').textContent=isMuted?'🔇 已静音':'🔊 静音';
-  if(isMuted){ stopMusic(); } else if(isActive){ startMusic(); }
+  document.getElementById('muteBtn').textContent=isMuted?'🔇':'🔊';
 }
 document.getElementById('muteBtn').addEventListener('click',toggleMute);
 document.querySelector('.nav-up').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'up'},'*'));
@@ -113,25 +97,18 @@ document.getElementById('collectBtn').addEventListener('click',()=>{
 updateSocial();
 function notifyPlayed(){ window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
 
-window.addEventListener('message',(e)=>{
-  if(e.data&&e.data.type==='setActive'){
-    isActive=e.data.active;
-    if(isActive&&!isMuted){ startMusic(); } else{ stopMusic(); }
-  }
-});
-
 const c=document.getElementById('c'),ctx=c.getContext('2d');
-const W=400,H=600;
-let paddle={x:160,w:80}, ball={x:200,y:500,r:6,dx:2.5,dy:-2.5};
+const W=400,H=500;
+let paddle={x:160,w:80}, ball={x:200,y:450,r:6,dx:2.5,dy:-2.5};
 let bricks=[], score=0, paused=false, running=true, winTriggered=false;
 function createBricks(){ bricks=[]; for(let i=0;i<5;i++)for(let j=0;j<8;j++)bricks.push({x:j*50+2,y:i*20+40,w:46,h:16,alive:true}); }
 function reset(){
-  createBricks(); ball={x:200,y:500,r:6,dx:2.5,dy:-2.5}; paddle.x=160; score=0; paused=false; running=true; winTriggered=false;
-  document.getElementById('pauseBtn').textContent='⏯️ 暂停';
-  stopMusic(); startMusic(); const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove(); notifyPlayed();
+  createBricks(); ball={x:200,y:450,r:6,dx:2.5,dy:-2.5}; paddle.x=160; score=0; paused=false; running=true; winTriggered=false;
+  document.getElementById('pauseBtn').textContent='⏯️';
+  const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove(); notifyPlayed();
 }
-function togglePause(){ paused=!paused; document.getElementById('pauseBtn').textContent=paused?'▶️ 继续':'⏯️ 暂停'; }
-function checkWin(){ if(bricks.every(b=>!b.alive) && !winTriggered){ winTriggered=true; running=false; stopMusic(); playSound('win'); showVictory(); setTimeout(reset,3000); } }
+function togglePause(){ paused=!paused; document.getElementById('pauseBtn').textContent=paused?'▶️':'⏯️'; }
+function checkWin(){ if(bricks.every(b=>!b.alive) && !winTriggered){ winTriggered=true; running=false; playSound('win'); showVictory(); setTimeout(reset,3000); } }
 function showVictory(){
   const ov=document.createElement('div'); ov.className='victory-overlay';
   for(let i=0;i<60;i++){
@@ -151,8 +128,8 @@ function draw(){
     ball.x+=ball.dx; ball.y+=ball.dy;
     if(ball.x-ball.r<0||ball.x+ball.r>W) ball.dx*=-1;
     if(ball.y-ball.r<0) ball.dy*=-1;
-    if(ball.y+ball.r>H){ running=false; playSound('die'); stopMusic(); alert('游戏结束！得分:'+score); reset(); return; }
-    if(ball.y+ball.r>580 && ball.y-ball.r<595 && ball.x>paddle.x && ball.x<paddle.x+paddle.w) ball.dy*=-1;
+    if(ball.y+ball.r>H){ running=false; playSound('die'); alert('游戏结束！得分:'+score); reset(); return; }
+    if(ball.y+ball.r>480 && ball.y-ball.r<495 && ball.x>paddle.x && ball.x<paddle.x+paddle.w) ball.dy*=-1;
     bricks.forEach(b=>{
       if(b.alive && ball.x+ball.r>b.x && ball.x-ball.r<b.x+b.w && ball.y+ball.r>b.y && ball.y-ball.r<b.y+b.h){
         ball.dy*=-1; b.alive=false; score++; playSound('hit'); checkWin();
@@ -162,7 +139,7 @@ function draw(){
   ctx.clearRect(0,0,W,H); ctx.fillStyle='#faf8ef'; ctx.fillRect(0,0,W,H);
   bricks.forEach(b=>{ if(b.alive){ ctx.fillStyle='#f2b179'; ctx.fillRect(b.x,b.y,b.w,b.h); } });
   ctx.fillStyle='#776e65'; ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#8f7a66'; ctx.fillRect(paddle.x,585,paddle.w,10);
+  ctx.fillStyle='#8f7a66'; ctx.fillRect(paddle.x,485,paddle.w,10);
   document.getElementById('scoreDisplay').textContent='得分 '+score;
   requestAnimationFrame(draw);
 }
