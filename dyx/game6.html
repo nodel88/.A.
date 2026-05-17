@@ -1,29 +1,96 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>
-body{margin:0;display:flex;justify-content:center;align-items:center;height:100vh;background:#333;color:#fff;font-family:sans-serif;}
-.board{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:#fff;padding:4px;}
-.cell{width:80px;height:80px;background:#333;display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer;}
-</style></head><body>
-<div><div class="board" id="board"></div><p id="msg" style="text-align:center;"></p></div>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f172a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui;color:#fff}
+.info{text-align:center;margin-bottom:8px}
+.title{font-size:32px;font-weight:900;color:#38bdf8}
+.desc{font-size:14px;color:#94a3b8}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#1e293b;padding:8px;border-radius:12px;width:90vmin;height:90vmin;max-width:400px;max-height:400px}
+.cell{aspect-ratio:1;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:8vmin;font-weight:800;cursor:pointer;transition:0.1s}
+.cell:hover{background:#475569}
+#msg{font-size:5vmin;margin-top:12px;font-weight:600}
+.controls{margin-top:8px}
+.controls button{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:18px;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="info">
+  <div class="title">⭕❌ 井字棋</div>
+  <div class="desc">两人轮流点击格子，三子连一线获胜</div>
+</div>
+<div class="board" id="board"></div>
+<p id="msg"></p>
+<div class="controls">
+  <button id="restartBtn">↺ 重新开始</button>
+</div>
 <script>
-let board=Array(9).fill(null),turn='X',gameover=false;
-function draw(){
-  const b=document.getElementById('board');
-  b.innerHTML='';
-  board.forEach((v,i)=>{
-    const d=document.createElement('div');d.className='cell';d.textContent=v||'';
-    d.onclick=()=>move(i);b.appendChild(d);
-  });
+function notifyPlayed() { if (window.parent) window.parent.postMessage({type:'played',gameId:'tictactoe'},'*'); }
+let audioCtx=null;
+function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
+function playSound(type){
+  if(!audioCtx) return;
+  const osc=audioCtx.createOscillator(), gain=audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  if(type==='place'){ osc.frequency.setValueAtTime(400,audioCtx.currentTime); gain.gain.setValueAtTime(0.08,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.1); osc.start(); osc.stop(audioCtx.currentTime+0.1); }
+  else if(type==='win'){ osc.type='triangle'; osc.frequency.setValueAtTime(523,audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(784,audioCtx.currentTime+0.5); gain.gain.setValueAtTime(0.2,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.5); osc.start(); osc.stop(audioCtx.currentTime+0.5); }
+  else if(type==='draw'){ osc.frequency.setValueAtTime(200,audioCtx.currentTime); gain.gain.setValueAtTime(0.1,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.4); osc.start(); osc.stop(audioCtx.currentTime+0.4); }
 }
+let musicInterval=null;
+function startMusic(){
+  if(musicInterval) return;
+  const notes=[262,294,330,349,330,294,262,247];
+  let i=0;
+  musicInterval=setInterval(()=>{
+    if(!audioCtx) return;
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
+    g.gain.setValueAtTime(0.02,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.5);
+    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.5);
+    i++;
+  },700);
+}
+function stopMusic(){ if(musicInterval){ clearInterval(musicInterval); musicInterval=null; } }
+function showVictory(){
+  const div=document.createElement('div'); div.id='victoryOverlay';
+  div.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;z-index:999;pointer-events:none;';
+  document.body.appendChild(div);
+  for(let i=0;i<60;i++){
+    const p=document.createElement('div');
+    p.style.cssText=`position:absolute;width:6px;height:6px;background:hsl(${Math.random()*360},100%,60%);border-radius:50%;left:50%;top:50%;`;
+    div.appendChild(p);
+    const angle=Math.random()*Math.PI*2, dist=80+Math.random()*120;
+    p.animate([{transform:'translate(-50%,-50%) scale(0)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(1)`,opacity:0}],{duration:800,delay:Math.random()*300,fill:'forwards'});
+  }
+  const txt=document.createElement('div'); txt.textContent='🎉 恭喜通关！';
+  txt.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:36px;font-weight:900;color:#fff;text-shadow:0 0 20px #ff0;';
+  div.appendChild(txt);
+  setTimeout(()=>{ const ov=document.getElementById('victoryOverlay'); if(ov) ov.remove(); },3000);
+}
+function removeVictory(){ const ov=document.getElementById('victoryOverlay'); if(ov) ov.remove(); }
+
+let board, turn, gameover;
+function init(){
+  board=Array(9).fill(null); turn='X'; gameover=false;
+  document.getElementById('msg').textContent='';
+  stopMusic(); startMusic(); removeVictory(); notifyPlayed();
+  draw();
+}
+function draw(){ const b=document.getElementById('board'); b.innerHTML=''; board.forEach((v,i)=>{ const d=document.createElement('div'); d.className='cell'; d.textContent=v||''; d.onclick=()=>move(i); b.appendChild(d); }); }
 function move(i){
-  if(gameover||board[i])return;
-  board[i]=turn;
-  if(checkWin(turn)){document.getElementById('msg').textContent=turn+'赢了！';gameover=true;draw();return;}
-  if(board.every(v=>v)){document.getElementById('msg').textContent='平局';gameover=true;draw();return;}
-  turn=turn==='X'?'O':'X';draw();
+  initAudio();
+  if(gameover||board[i]) return;
+  playSound('place'); board[i]=turn;
+  if(checkWin(turn)){ document.getElementById('msg').textContent=turn+' 赢了！'; gameover=true; draw(); stopMusic(); playSound('win'); showVictory(); setTimeout(init,3000); return; }
+  if(board.every(v=>v)){ document.getElementById('msg').textContent='平局'; gameover=true; draw(); stopMusic(); playSound('draw'); return; }
+  turn=turn==='X'?'O':'X'; draw();
 }
-function checkWin(p){
-  const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-  return wins.some(w=>w.every(i=>board[i]===p));
-}
-draw();
-</script></body></html>
+function checkWin(p){ const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]; return wins.some(w=>w.every(i=>board[i]===p)); }
+document.getElementById('restartBtn').onclick=init;
+init();
+</script>
+</body>
+</html>
