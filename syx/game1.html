@@ -6,8 +6,8 @@
 <title>贪吃蛇</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#faf8ef;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui}
-canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+body{background:#faf8ef;padding-bottom:48px;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:system-ui}
+canvas{position:absolute;top:0;left:0;width:100%;height:calc(100% - 48px)}
 .info{position:fixed;top:16px;left:16px;z-index:2;pointer-events:none}
 .title{color:#776e65;font-size:28px;font-weight:900}
 .desc{color:#a39480;font-size:12px;margin-top:2px}
@@ -30,7 +30,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 <canvas id="c" width="300" height="300"></canvas>
 <div class="info">
   <div class="title">🐍 贪吃蛇</div>
-  <div class="desc">手机滑动 / 电脑方向键控制蛇吃食物</div>
+  <div class="desc">手机滑动屏幕 / 电脑方向键控制蛇吃食物</div>
   <div class="score" id="scoreDisplay">得分 0</div>
 </div>
 <div class="btns">
@@ -48,7 +48,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 </div>
 <script>
 const GAME_ID='snake';
-let audioCtx=null, musicInterval=null, isMuted=false;
+let audioCtx=null, musicInterval=null, isMuted=false, isActive=true;
 function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
 function playSound(type){
   if(!audioCtx||isMuted) return;
@@ -58,11 +58,11 @@ function playSound(type){
   else if(type==='die'){ osc.frequency.setValueAtTime(400,audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(100,audioCtx.currentTime+0.4); gain.gain.setValueAtTime(0.2,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.4); osc.start(); osc.stop(audioCtx.currentTime+0.4); }
 }
 function startMusic(){
-  if(musicInterval||isMuted) return;
-  const notes=[262,294,330,349,392,349,330,294]; // 不同游戏换旋律
+  if(musicInterval||isMuted||!isActive) return;
+  const notes=[262,294,330,349,392,349,330,294];
   let i=0;
   musicInterval=setInterval(()=>{
-    if(!audioCtx||isMuted) return;
+    if(!audioCtx||isMuted||!isActive) return;
     const o=audioCtx.createOscillator(), g=audioCtx.createGain();
     o.type='triangle'; o.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
     g.gain.setValueAtTime(0.03,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3);
@@ -73,30 +73,26 @@ function startMusic(){
 function stopMusic(){ if(musicInterval){ clearInterval(musicInterval); musicInterval=null; } }
 function playFireworkSound(){
   if(!audioCtx||isMuted) return;
-  const bufferSize = audioCtx.sampleRate * 0.5;
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i/(audioCtx.sampleRate*0.1));
-  const source = audioCtx.createBufferSource();
-  source.buffer = buffer;
-  const gain = audioCtx.createGain();
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-  source.connect(gain); gain.connect(audioCtx.destination);
-  source.start(); source.stop(audioCtx.currentTime + 0.5);
+  const bufferSize=audioCtx.sampleRate*0.5;
+  const buffer=audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+  const data=buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(audioCtx.sampleRate*0.1));
+  const source=audioCtx.createBufferSource(); source.buffer=buffer;
+  const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0.5,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.5);
+  source.connect(gain); gain.connect(audioCtx.destination); source.start(); source.stop(audioCtx.currentTime+0.5);
 }
 function toggleMute(){
-  isMuted = !isMuted;
-  document.getElementById('muteBtn').textContent = isMuted ? '🔇 已静音' : '🔊 静音';
-  if (isMuted) { stopMusic(); } else { startMusic(); }
+  isMuted=!isMuted;
+  document.getElementById('muteBtn').textContent=isMuted?'🔇 已静音':'🔊 静音';
+  if(isMuted){ stopMusic(); } else if(isActive){ startMusic(); }
 }
-document.getElementById('muteBtn').addEventListener('click', toggleMute);
+document.getElementById('muteBtn').addEventListener('click',toggleMute);
 
 // 导航按钮
-document.querySelector('.nav-up').addEventListener('click', ()=> window.parent.postMessage({type:'nav',direction:'up'},'*'));
-document.querySelector('.nav-down').addEventListener('click', ()=> window.parent.postMessage({type:'nav',direction:'down'},'*'));
+document.querySelector('.nav-up').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'up'},'*'));
+document.querySelector('.nav-down').addEventListener('click',()=>window.parent.postMessage({type:'nav',direction:'down'},'*'));
 
-// 社交数据（同前，略）
+// 社交
 function updateSocial(){
   const likes=parseInt(localStorage.getItem('like_'+GAME_ID)||'0');
   document.getElementById('likeCount').textContent=likes;
@@ -117,7 +113,16 @@ document.getElementById('collectBtn').addEventListener('click',()=>{
   localStorage.setItem('favs',JSON.stringify(favs)); updateSocial();
 });
 updateSocial();
-function notifyPlayed(){ if(window.parent) window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
+function notifyPlayed(){ window.parent.postMessage({type:'played',gameId:GAME_ID},'*'); }
+
+// 音乐激活管理（接收首页消息）
+window.addEventListener('message',(e)=>{
+  if(e.data&&e.data.type==='setActive'){
+    isActive=e.data.active;
+    if(isActive&&!isMuted){ startMusic(); }
+    else{ stopMusic(); }
+  }
+});
 
 // 游戏逻辑
 const c=document.getElementById('c'),ctx=c.getContext('2d');
@@ -127,21 +132,21 @@ function randFood(){
   let ok=false;
   while(!ok){
     let x=Math.floor(Math.random()*GRID),y=Math.floor(Math.random()*GRID);
-    if(!snake.some(s=>s.x===x&&s.y===y)){food={x,y};ok=true;}
+    if(!snake.some(s=>s.x===x&&s.y===y)){ food={x,y}; ok=true; }
   }
 }
 function reset(){
-  snake=[{x:10,y:10}];dx=1;dy=0;score=0;randFood();paused=false;running=true;winTriggered=false;
+  snake=[{x:10,y:10}]; dx=1;dy=0;score=0;randFood();paused=false;running=true;winTriggered=false;
   document.getElementById('pauseBtn').textContent='⏯️ 暂停';
-  stopMusic();startMusic();
-  const ov=document.querySelector('.victory-overlay');if(ov)ov.remove();
+  stopMusic(); startMusic();
+  const ov=document.querySelector('.victory-overlay'); if(ov) ov.remove();
   notifyPlayed();
 }
-function togglePause(){paused=!paused;document.getElementById('pauseBtn').textContent=paused?'▶️ 继续':'⏯️ 暂停';}
-function gameOver(){running=false;playSound('die');stopMusic();alert('游戏结束！得分:'+score);reset();}
-function checkWin(){if(score>=10&&!winTriggered){winTriggered=true;running=false;stopMusic();showVictory();setTimeout(reset,3000);}}
+function togglePause(){ paused=!paused; document.getElementById('pauseBtn').textContent=paused?'▶️ 继续':'⏯️ 暂停'; }
+function gameOver(){ running=false; playSound('die'); stopMusic(); alert('游戏结束！得分:'+score); reset(); }
+function checkWin(){ if(score>=10&&!winTriggered){ winTriggered=true; running=false; stopMusic(); showVictory(); setTimeout(reset,3000); } }
 function showVictory(){
-  const ov=document.createElement('div');ov.className='victory-overlay';
+  const ov=document.createElement('div'); ov.className='victory-overlay';
   for(let i=0;i<60;i++){
     const p=document.createElement('div');
     p.style.cssText=`position:absolute;width:6px;height:6px;background:hsl(${Math.random()*360},100%,60%);border-radius:50%;left:50%;top:50%;`;
@@ -149,23 +154,23 @@ function showVictory(){
     const angle=Math.random()*Math.PI*2,dist=80+Math.random()*120;
     p.animate([{transform:'translate(-50%,-50%) scale(0)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(1)`,opacity:0}],{duration:800,delay:Math.random()*300,fill:'forwards'});
   }
-  const txt=document.createElement('div');txt.className='victory-text';txt.textContent='🎉 恭喜成功！';
+  const txt=document.createElement('div'); txt.className='victory-text'; txt.textContent='🎉 恭喜成功！';
   ov.appendChild(txt);
   document.body.appendChild(ov);
   playFireworkSound();
   setTimeout(()=>ov.remove(),3000);
 }
 function loop(){
-  if(!running||paused){requestAnimationFrame(loop);return;}
+  if(!running||paused){ requestAnimationFrame(loop); return; }
   const head={x:snake[0].x+dx,y:snake[0].y+dy};
-  if(head.x<0||head.x>=GRID||head.y<0||head.y>=GRID||snake.some(s=>s.x===head.x&&s.y===head.y)){gameOver();return;}
+  if(head.x<0||head.x>=GRID||head.y<0||head.y>=GRID||snake.some(s=>s.x===head.x&&s.y===head.y)){ gameOver(); return; }
   snake.unshift(head);
-  if(head.x===food.x&&head.y===food.y){score++;randFood();playSound('eat');checkWin();}else{snake.pop();}
-  ctx.fillStyle='#faf8ef';ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle='#cdc1b4';ctx.lineWidth=0.5;
-  for(let i=0;i<=GRID;i++){ctx.beginPath();ctx.moveTo(i*W/GRID,0);ctx.lineTo(i*W/GRID,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*H/GRID);ctx.lineTo(W,i*H/GRID);ctx.stroke();}
-  ctx.fillStyle='#f65e3b';ctx.fillRect(food.x*W/GRID+2,food.y*H/GRID+2,W/GRID-4,H/GRID-4);
-  snake.forEach((s,i)=>{ctx.fillStyle=`rgba(119,110,101,${1-i*0.03})`;ctx.fillRect(s.x*W/GRID+2,s.y*H/GRID+2,W/GRID-4,H/GRID-4);});
+  if(head.x===food.x&&head.y===food.y){ score++;randFood();playSound('eat');checkWin(); }else{ snake.pop(); }
+  ctx.fillStyle='#faf8ef'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#cdc1b4'; ctx.lineWidth=0.5;
+  for(let i=0;i<=GRID;i++){ ctx.beginPath(); ctx.moveTo(i*W/GRID,0); ctx.lineTo(i*W/GRID,H); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i*H/GRID); ctx.lineTo(W,i*H/GRID); ctx.stroke(); }
+  ctx.fillStyle='#f65e3b'; ctx.fillRect(food.x*W/GRID+2,food.y*H/GRID+2,W/GRID-4,H/GRID-4);
+  snake.forEach((s,i)=>{ ctx.fillStyle=`rgba(119,110,101,${1-i*0.03})`; ctx.fillRect(s.x*W/GRID+2,s.y*H/GRID+2,W/GRID-4,H/GRID-4); });
   document.getElementById('scoreDisplay').textContent='得分 '+score;
   requestAnimationFrame(loop);
 }
@@ -178,11 +183,11 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft'&&dx===0){dx=-1;dy=0;}else if(e.key==='ArrowRight'&&dx===0){dx=1;dy=0;}
 });
 let tx=0,ty=0;
-c.addEventListener('touchstart',e=>{initAudio();tx=e.touches[0].clientX;ty=e.touches[0].clientY;});
+c.addEventListener('touchstart',e=>{ initAudio(); tx=e.touches[0].clientX; ty=e.touches[0].clientY; });
 c.addEventListener('touchend',e=>{
   const dx2=e.changedTouches[0].clientX-tx,dy2=e.changedTouches[0].clientY-ty;
-  if(Math.abs(dx2)>Math.abs(dy2)){if(dx2>0&&dx===0){dx=1;dy=0;}else if(dx2<0&&dx===0){dx=-1;dy=0;}}
-  else{if(dy2>0&&dy===0){dx=0;dy=1;}else if(dy2<0&&dy===0){dx=0;dy=-1;}}
+  if(Math.abs(dx2)>Math.abs(dy2)){ if(dx2>0&&dx===0){dx=1;dy=0;}else if(dx2<0&&dx===0){dx=-1;dy=0;} }
+  else{ if(dy2>0&&dy===0){dx=0;dy=1;}else if(dy2<0&&dy===0){dx=0;dy=-1;} }
 });
 loop();
 </script>
