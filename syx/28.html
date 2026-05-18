@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>抖音模式刷H5小游戏</title>
+    <style>
+        /* CSS样式内嵌区域 */
+        :root {
+            --primary-text: #fff;
+            --secondary-text: rgba(255, 255, 255, 0.7);
+            --theme-color: #fe2c55;
+            --dark-bg: #121212;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--primary-text);
+        }
+        /* ... Swiper.js 的 CSS 代码 ... */
+        /* ... 应用的自定义CSS, 包括顶部栏、侧边栏、按钮、弹窗、烟花特效等样式 ... */
+        /* 示例: */
+        .swiper-container { width: 100%; height: 100vh; }
+        .swiper-slide {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background: #000;
+            position: relative;
+        }
+        .game-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .action-bar {
+            position: absolute;
+            right: 15px;
+            bottom: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+        }
+        .action-button { /* ... 点赞、收藏按钮样式 ... */ }
+        .win-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none; /* 默认隐藏 */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 9999;
+        }
+        #fireworks-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+        .congrats-text {
+            font-size: 3rem; font-weight: bold;
+            color: #fff; text-shadow: 0 0 10px #ff0, 0 0 20px #ff0;
+            animation: flicker 1.5s infinite alternate;
+        }
+        @keyframes flicker {
+            /* ... 闪烁动画定义 ... */
+        }
+    </style>
+</head>
+<body>
+    <!-- 页面HTML结构 -->
+    <div id="app">
+        <!-- 顶部信息栏 -->
+        <header class="top-bar">
+             <div id="username-display"></div>
+             <nav>
+                 <button id="show-played">已玩: <span id="played-count">0</span></button>
+                 <button id="show-favorites">收藏: <span id="favorites-count">0</span></button>
+                 <button id="show-likes">点赞: <span id="likes-count">0</span></button>
+             </nav>
+        </header>
+
+        <!-- Swiper 滑动容器 -->
+        <div class="swiper-container">
+            <div class="swiper-wrapper">
+                <!-- 游戏1: 贪吃蛇 -->
+                <div class="swiper-slide" data-game-id="snake" data-game-title="贪吃蛇">
+                    <canvas id="snake-canvas" class="game-canvas"></canvas>
+                    <div class="game-info">玩法：电脑用方向键，手机滑动屏幕控制方向</div>
+                </div>
+                <!-- 游戏2: 俄罗斯方块 -->
+                <div class="swiper-slide" data-game-id="tetris" data-game-title="俄罗斯方块">
+                     <canvas id="tetris-canvas" class="game-canvas"></canvas>
+                     <div class="game-info">玩法：电脑方向键移动/旋转，手机点击屏幕两侧和下方</div>
+                </div>
+                <!-- ... 其他5个游戏slide ... -->
+            </div>
+        </div>
+
+        <!-- 侧边操作栏 (动态生成或单个模板) -->
+        <div class="action-bar" id="main-action-bar">
+            <button class="action-button" id="like-btn">
+                <svg>...</svg> <span id="like-count">0</span>
+            </button>
+            <button class="action-button" id="favorite-btn">
+                <svg>...</svg> <span id="favorite-count">0</span>
+            </button>
+        </div>
+
+        <!-- 通关祝贺特效 -->
+        <div class="win-overlay" id="win-animation-overlay">
+            <canvas id="fireworks-canvas"></canvas>
+            <h1 class="congrats-text">恭喜通关！</h1>
+        </div>
+
+        <!-- 游戏列表弹窗 -->
+        <div class="modal" id="list-modal">...</div>
+    </div>
+
+    <script>
+        // JavaScript 内嵌区域
+
+        // Part 1: Swiper.js 库的源代码
+        // (此处粘贴 swiper-bundle.min.js 的全部内容)
+        /*!
+        * Swiper ...
+        */
+
+        // Part 2: 资源 Base64 数据
+        const ASSETS = {
+            // SNAKE_HEAD_IMG: 'data:image/png;base64,...',
+            // TETRIS_BLOCK_SOUND: 'data:audio/wav;base64,...',
+            // ...所有游戏的图片和音频资源
+        };
+
+        // Part 3: 主应用逻辑 (App.js)
+        const App = {
+            init() {
+                UserData.init();
+                UI.init();
+                GameManager.init();
+            }
+        };
+
+        // Part 4: 用户数据管理 (UserData.js)
+        const UserData = {
+            key: 'tikgame_userdata',
+            data: null,
+            init() { /* ... 如上文所述的初始化逻辑 ... */ },
+            save() { /* ... 保存到 localStorage ... */ },
+            toggleLike(gameId) { /* ... 点赞/取消点赞逻辑 ... */ },
+            // ... 其他数据操作方法
+        };
+
+        // Part 5: UI 管理 (UI.js)
+        const UI = {
+            init() { /* ... 初始化UI元素，绑定事件 ... */ },
+            updateHeader() { /* ... 更新顶部统计数据 ... */ },
+            updateActionButtons(gameId) { /* ... 更新侧边点赞收藏按钮状态 ... */ },
+            showWinAnimation() { /* ... 显示烟花特效 ... */ },
+            // ... 其他UI操作方法
+        };
+        
+        // Part 6: 烟花特效代码 (Fireworks.js)
+        const Fireworks = {
+            init(canvas) { /* ... 初始化烟花 ... */ },
+            run() { /* ... 运行动画循环 ... */ },
+            stop() { /* ... 停止动画 ... */ }
+        };
+
+        // Part 7: 游戏管理器 (GameManager.js)
+        const GameManager = {
+            games: [],
+            swiper: null,
+            activeGame: null,
+            init() {
+                this.games = [GameSnake, GameTetris /*, ...其他游戏对象*/];
+                this.swiper = new Swiper('.swiper-container', {
+                    direction: 'vertical',
+                    slidesPerView: 1,
+                    mousewheel: true,
+                });
+                this.swiper.on('slideChange', this.onSlideChange.bind(this));
+                // 初始化第一个游戏
+                this.onSlideChange();
+            },
+            onSlideChange() { /* ... 如上文所述的游戏切换和初始化逻辑 ... */ }
+        };
+
+        // Part 8: 各个游戏的独立逻辑
+        // 游戏1: 贪吃蛇 (GameSnake.js)
+        const GameSnake = {
+            id: 'snake',
+            title: '贪吃蛇',
+            isInitialized: false,
+            init(container) { /* ... 游戏初始化 ... */ },
+            start() { /* ... 开始游戏 ... */ },
+            stop() { /* ... 停止游戏 ... */ },
+            // ... 游戏内部逻辑
+        };
+        // 游戏2: 俄罗斯方块 (GameTetris.js)
+        const GameTetris = { /* ... 类似结构 ... */ };
+        // ... 其他5个游戏的JS对象
+
+        // 启动应用
+        document.addEventListener('DOMContentLoaded', () => {
+            App.init();
+        });
+
+    </script>
+</body>
+</html>
