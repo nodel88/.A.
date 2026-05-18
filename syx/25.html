@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>滑动小游戏合集</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:pan-y;}
+body{height:100vh;overflow:hidden;background:#faf8ef;font-family:微软雅黑;color:#776e65;}
+/* 滑动容器 */
+.wrap{height:calc(100vh - 70px);overflow:hidden;position:relative;}
+.game-item{width:100%;height:100%;position:absolute;top:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:15px;transition:transform 0.3s ease;}
+/* 游戏通用样式 2048暖色调 */
+.game-title{font-size:22px;font-weight:bold;margin:8px 0;}
+.tip{font-size:13px;color:#8f7a66;background:#eee4da;padding:5px 10px;border-radius:6px;margin-bottom:10px;}
+/* 操作按钮区 */
+.btn-box{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;}
+.sw-btn{width:38px;height:38px;border-radius:50%;border:none;background:#bbada0;color:#fff;font-size:18px;cursor:pointer;}
+.like-btn,.col-btn,.reset-btn{padding:8px 12px;border:none;border-radius:6px;background:#bbada0;color:#fff;cursor:pointer;}
+.like-btn.active{background:#f65e3b;}
+.col-btn.active{background:#ffc107;color:#333;}
+.num{margin-left:4px;}
+/* 底部导航栏 */
+.foot-bar{position:fixed;bottom:0;left:0;right:0;height:70px;background:#bbada0;display:flex;justify-content:space-around;align-items:center;color:#fff;z-index:99;}
+.foot-item{text-align:center;font-size:12px;cursor:pointer;}
+.foot-item i{font-size:18px;display:block;}
+/* 弹窗面板 */
+.pop{position:fixed;top:0;left:0;right:0;bottom:70px;background:#faf8ef;z-index:100;display:none;padding:20px;overflow-y:auto;}
+.pop.show{display:block;}
+.pop-title{font-size:20px;margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid #bbada0;}
+.close-pop{position:absolute;top:15px;right:15px;width:30px;height:30px;border-radius:50%;border:none;background:#bbada0;color:#fff;cursor:pointer;}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#eee4da;border-radius:6px;margin:8px 0;}
+.del-btn{background:#f65e3b;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;}
+/* 烟花与恭喜文字 */
+#fireCanvas{position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:999;display:none;}
+.success-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:50px;font-weight:bold;color:#f65e3b;text-shadow:0 0 15px #ffc107;z-index:1000;display:none;animation:flash 0.5s infinite alternate;}
+@keyframes flash{0%{scale:1;opacity:1;}100%{scale:1.1;opacity:0.8;}}
+/* 静音按钮 */
+.mute{position:fixed;top:15px;right:15px;width:40px;height:40px;border-radius:50%;border:none;background:#bbada0;color:#fff;font-size:18px;z-index:88;cursor:pointer;}
+/* 7款游戏画布/容器样式 */
+#g2048{display:grid;grid-template-columns:repeat(4,65px);gap:8px;background:#bbada0;padding:10px;border-radius:8px;}
+.g2048-cell{width:65px;height:65px;background:#cdc1b4;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:bold;}
+#snakeBox{width:280px;height:280px;background:#bbada0;display:grid;grid-template-columns:repeat(20,1fr);gap:1px;padding:5px;border-radius:8px;}
+.snake-body{background:#776e65;}
+.snake-food{background:#f65e3b;}
+#tttBox{display:grid;grid-template-columns:repeat(3,80px);gap:8px;background:#bbada0;padding:10px;border-radius:8px;}
+.ttt-cell{width:80px;height:80px;background:#cdc1b4;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer;}
+canvas{border-radius:8px;}
+</style>
+</head>
+<body>
+<!-- 全局静音 -->
+<button class="mute" id="muteBtn">🔊</button>
+<!-- 烟花画布+恭喜文字 -->
+<canvas id="fireCanvas"></canvas>
+<div class="success-text">恭喜成功！</div>
+
+<!-- 主滑动容器 -->
+<div class="wrap" id="gameWrap">
+    <!-- 游戏1 2048 -->
+    <div class="game-item" data-gid="1">
+        <div class="game-title">2048</div>
+        <div class="tip">手机左右上下滑动，电脑方向键合并数字合成2048</div>
+        <div id="g2048"></div>
+        <div class="btn-box">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="sw-btn" onclick="lastGame()">↑</button>
+                <button class="sw-btn" onclick="nextGame()">↓</button>
+            </div>
+            <button class="like-btn" data-id="1">点赞<span class="num likeNum1">26</span></button>
+            <button class="col-btn" data-id="1">收藏<span class="num colNum1">12</span></button>
+            <button class="reset-btn" onclick="init2048()">重玩</button>
+        </div>
+    </div>
+    <!-- 游戏2 贪吃蛇 -->
+    <div class="game-item" data-gid="2">
+        <div class="game-title">经典贪吃蛇</div>
+        <div class="tip">滑动屏幕控制方向，吃食物变长别撞边界</div>
+        <div id="snakeBox"></div>
+        <div class="btn-box">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="sw-btn" onclick="lastGame()">↑</button>
+                <button class="sw-btn" onclick="nextGame()">↓</button>
+            </div>
+            <button class="like-btn" data-id="2">点赞<span class="num likeNum2">18</span></button>
+            <button class="col-btn" data-id="2">收藏<span class="num colNum2">9</span></button>
+            <button class="reset-btn" onclick="initSnake()">重玩</button>
+        </div>
+    </div>
+    <!-- 游戏3 井字棋 -->
+    <div class="game-item" data-gid="3">
+        <div class="game-title">双人井字棋</div>
+        <div class="tip">轮流点击落子，率先连成一线即可获胜</div>
+        <div id="tttBox"></div>
+        <div class="btn-box">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="sw-btn" onclick="lastGame()">↑</button>
+                <button class="sw-btn" onclick="nextGame()">↓</button>
+            </div>
+            <button class="like-btn" data-id="3">点赞<span class="num likeNum3">32</span></button>
+            <button class="col-btn" data-id="3">收藏<span class="num colNum3">15</span></button>
+            <button class="reset-btn" onclick="initTtt()">重玩</button>
+        </div>
+    </div>
+    <!-- 游戏4 打砖块 -->
+    <div class="game-item" data-gid="4">
+        <div class="game-title">趣味打砖块</div>
+        <div class="tip">左右滑动操控挡板，击碎所有砖块通关</div>
+        <canvas id="breakCanvas" width="280" height="320"></canvas>
+        <div class="btn-box">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="sw-btn" onclick="lastGame()">↑</button>
+                <button class="sw-btn" onclick="nextGame()">↓</button>
+            </div>
+            <button class="like-btn" data-id="4">点赞<span class="num likeNum4">21</span></button>
+            <button class="col-btn" data-id="4">收藏<span class="num colNum4">7</span></button>
+            <button class="reset-btn" onclick="initBreak()">重玩</button>
+        </div>
+    </div>
+    <!-- 游戏5 翻牌记忆 -->
+    <div class="game-item" data-gid="5">
+        <div class="game-title">记忆翻牌</div>
+        <div class="tip">点击翻转卡牌，找出全部相同卡牌配对成功</div>
+        <div id="memBox" style="display:grid;grid-template-columns:repeat(4,60px);gap:6px;background:#bbada0;padding:10px;border-radius:8px;"></div>
+        <div class="btn-box">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="sw-btn" onclick="lastGame()">↑</button>
+                <button class="sw-btn" onclick="nextGame()">↓</button>
+            </div>
+            <button class="like-btn" data-id="5">点赞<span class="num likeNum5">29</span></button>
+            <button class="col-btn" data-id="5">收藏<span class="num colNum5">11</span></button>
+            <button class="reset-btn" onclick="initMemory()">重玩</button>
+        </div>
+    </div>
+    <!-- 游戏6 俄罗斯方块 -->
+    <div class="game-item" data-gid="6">
+        <div class="game-title">经典俄罗斯方块</div>
+        <div class="tip">方向键左右移动，空格下落，填满消除整行</div>
+        <canvas id="tetCanvas" width="200" height="320"></canvas>
+        <div class="btn-box">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="sw-btn" onclick="lastGame()">↑</button>
+                <button class="sw-btn" onclick="nextGame()">↓</button>
+            </div>
+            <button class="like-btn" data-id="6">点赞<span class="num likeNum6">45</span></button>
+            <button class="col-btn" data-id="6">收藏<span class="num colNum6">22</span></button>
+            <button class="reset-btn" onclick="initTetris()">重玩</button>
+        </div>
+    </div>
+    <!-- 游戏7 消除小游戏 -->
+    <div class="game-item" data-gid="7">
+        <div class="game-title">休闲三连消除</div>
+        <div class="tip">点击相邻图案互换，凑齐三个相同即可消除</div>
+        <div id="matchBox" style="display:grid;grid-template-columns:repeat(5,50px);gap:5px;background:#bbada0;padding:10px;border-radius:8px;"></div>
+        <div class="btn-box">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="sw-btn" onclick="lastGame()">↑</button>
+                <button class="sw-btn" onclick="nextGame()">↓</button>
+            </div>
+            <button class="like-btn" data-id="7">点赞<span class="num likeNum7">36</span></button>
+            <button class="col-btn" data-id="7">收藏<span class="num colNum7">18</span></button>
+            <button class="reset-btn" onclick="initMatch()">重玩</button>
+        </div>
+    </div>
+</div>
+
+<!-- 底部功能栏 -->
+<div class="foot-bar">
+    <div class="foot-item" id="userNameBox">
+        <i>👤</i>
+        <span id="userName">游客玩家</span>
+    </div>
+    <div class="foot-item" id="playBtn">
+        <i>🎮</i>
+        <span>已玩:<span id="playCount">0</span></span>
+    </div>
+    <div class="foot-item" id="colBtn">
+        <i>⭐</i>
+        <span>收藏:<span id="colCount">0</span></span>
+    </div>
+    <div class="foot-item" id="likeBtn">
+        <i>👍</i>
+        <span>点赞:<span id="likeTotal">0</span></span>
+    </div>
+</div>
+
+<!-- 已玩弹窗 -->
+<div class="pop" id="playPop">
+    <h3 class="pop-title">已玩游戏列表</h3>
+    <button class="close-pop" onclick="closeAllPop()">×</button>
+    <div id="playList"></div>
+</div>
+<!-- 收藏弹窗 -->
+<div class="pop" id="colPop">
+    <h3 class="pop-title">我的收藏游戏</h3>
+    <button class="close-pop" onclick="closeAllPop()">×</button>
+    <div id="colList"></div>
+</div>
+<!-- 点赞弹窗 -->
+<div class="pop" id="likePop">
+    <h3 class="pop-title">我点赞的游戏</h3>
+    <button class="close-pop" onclick="closeAllPop()">×</button>
+    <div id="likeList"></div>
+</div>
+
+<script>
+// ========== 全局基础配置 ==========
+const gameList = [
+    {id:1,name:"2048"},{id:2,name:"贪吃蛇"},{id:3,name:"井字棋"},
+    {id:4,name:"打砖块"},{id:5,name:"记忆翻牌"},{id:6,name:"俄罗斯方块"},{id:7,name:"三连消除"}
+];
+let nowIndex = 0;
+const items = document.querySelectorAll('.game-item');
+let startY = 0, moveY = 0;
+let audioCtx = new (window.AudioContext||webkitAudioContext)();
+let muteState = false;
+
+// 音效播放
+function playAudio(type){
+    if(muteState)return;
+    let osc = audioCtx.createOscillator();
+    let gain = audioCtx.createGain();
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    switch(type){
+        case "click":osc.frequency.value=400;gain.gain.value=0.1;osc.start();osc.stop(audioCtx.currentTime+0.08);break;
+        case "like":osc.frequency.value=700;gain.gain.value=0.12;osc.start();osc.stop(audioCtx.currentTime+0.12);break;
+        case "collect":osc.frequency.value=900;gain.gain.value=0.12;osc.start();osc.stop(audioCtx.currentTime+0.15);break;
+        case "win":let n=[520,650,780];n.forEach((f,i)=>{setTimeout(()=>{let o=audioCtx.createOscillator();let g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency=f;g.gain=0.15;o.start();o.stop(audioCtx.currentTime+0.2);},i*150)});break;
+    }
+}
+// 静音切换
+document.getElementById('muteBtn').onclick=function(){
+    muteState=!muteState;
+    this.innerText=muteState?"🔇":"🔊";
+}
+
+// ========== 滑动切换游戏 循环滚动 ==========
+function updatePos(){items.forEach((e,i)=>e.style.transform=`translateY(${(i-nowIndex)*100}%)`);}
+function nextGame(){nowIndex=(nowIndex+1)%items.length;updatePos();playAudio("click");savePlayGame(gameList[nowIndex].id);}
+function lastGame(){nowIndex=(nowIndex-1+items.length)%items.length;updatePos();playAudio("click");savePlayGame(gameList[nowIndex].id);}
+// 触摸滑动
+document.getElementById('gameWrap').addEventListener('touchstart',e=>startY=e.touches[0].clientY);
+document.getElementById('gameWrap').addEventListener('touchmove',e=>e.preventDefault());
+document.getElementById('gameWrap').addEventListener('touchend',e=>{
+    moveY=startY-e.changedTouches[0].clientY;
+    if(moveY>60)nextGame();
+    if(moveY<-60)lastGame();
+});
+// 滚轮切换
+document.getElementById('gameWrap').addEventListener('wheel',e=>{
+    e.preventDefault();e.deltaY>0?nextGame():lastGame();
+})
+
+// ========== LocalStorage 本地存储系统 ==========
+// 初始化数据
+function initLocalData(){
+    if(!localStorage.userName)localStorage.userName=randomName();
+    if(!localStorage.playArr)localStorage.playArr=JSON.stringify([]);
+    if(!localStorage.likeArr)localStorage.likeArr=JSON.stringify([]);
+    if(!localStorage.colArr)localStorage.colArr=JSON.stringify([]);
+    if(!localStorage.likeNum)localStorage.likeNum=JSON.stringify({1:26,2:18,3:32,4:21,5:29,6:45,7:36});
+    if(!localStorage.colNum)localStorage.colNum=JSON.stringify({1:12,2:9,3:15,4:7,5:11,6:22,7:18});
+}
+// 随机用户名
+function randomName(){
+    let a=["欢乐","元气","呆萌","热血","佛系","酷飒","温柔","机智"];
+    let b["游戏达人","闯关高手","休闲玩家","小小玩家","极速玩家"];
+    return a[Math.floor(Math.random()*a.length)]+b[Math.floor(Math.random()*b.length)]+Math.floor(Math.random()*999);
+}
+// 已玩游戏保存
+function savePlayGame(gid){
+    let arr=JSON.parse(localStorage.playArr);
+    if(!arr.includes(gid)){arr.push(gid);localStorage.playArr=JSON.stringify(arr);refreshFootData();}
+}
+// 点赞切换
+document.querySelectorAll('.like-btn').forEach(btn=>{
+    btn.onclick=function(){
+        let gid=parseInt(this.dataset.id);
+        let likeArr=JSON.parse(localStorage.likeArr);
+        let numObj=JSON.parse(localStorage.likeNum);
+        if(likeArr.includes(gid)){
+            likeArr=likeArr.filter(v=>v!=gid);
+            numObj[gid]=Math.max(0,numObj[gid]-1);
+            this.classList.remove('active');
+        }else{
+            likeArr.push(gid);
+            numObj[gid]=Math.min(999,numObj[gid]+1);
+            this.classList.add('active');
+            playAudio("like");
+        }
+        localStorage.likeArr=JSON.stringify(likeArr);
+        localStorage.likeNum=JSON.stringify(numObj);
+        refreshAllNum();refreshFootData();
+    }
+})
+// 收藏切换
+document.querySelectorAll('.col-btn').forEach(btn=>{
+    btn.onclick=function(){
+        let gid=parseInt(this.dataset.id);
+        let colArr=JSON.parse(localStorage.colArr);
+        let numObj=JSON.parse(localStorage.colNum);
+        if(colArr.includes(gid)){
+            colArr=colArr.filter(v=>v!=gid);
+            numObj[gid]=Math.max(0,numObj[gid]-1);
+            this.classList.remove('active');
+        }else{
+            colArr.push(gid);
+            numObj[gid]=Math.min(999,numObj[gid]+1);
+            this.classList.add('active');
+            playAudio("collect");
+        }
+        localStorage.colArr=JSON.stringify(colArr);
+        localStorage.colNum=JSON.stringify(numObj);
+        refreshAllNum();refreshFootData();
+    }
+})
+// 刷新底部统计
+function refreshFootData(){
+    document.getElementById('userName').innerText=localStorage.userName;
+    document.getElementById('playCount').innerText=JSON.parse(localStorage.playArr).length;
+    document.getElementById('colCount').innerText=JSON.parse(localStorage.colArr).length;
+    document.getElementById('likeTotal').innerText=JSON.parse(localStorage.likeArr).length;
+}
+// 刷新所有点赞收藏数字
+function refreshAllNum(){
+    let lNum=JSON.parse(localStorage.likeNum);
+    let cNum=JSON.parse(localStorage.colNum);
+    let lArr=JSON.parse(localStorage.likeArr);
+    let cArr=JSON.parse(localStorage.colArr);
+    for(let i=1;i<=7;i++){
+        document.querySelector(`.likeNum${i}`).innerText=lNum[i];
+        document.querySelector(`.colNum${i}`).innerText=cNum[i];
+        if(lArr.includes(i))document.querySelector(`.like-btn[data-id="${i}"]`).classList.add('active');
+        if(cArr.includes(i))document.querySelector(`.col-btn[data-id="${i}"]`).classList.add('active');
+    }
+}
+// 弹窗打开关闭
+document.getElementById('playBtn').onclick=()=>openPop('playPop');
+document.getElementById('colBtn').onclick=()=>openPop('colPop');
+document.getElementById('likeBtn').onclick=()=>openPop('likePop');
+function openPop(id){closeAllPop();document.getElementById(id).classList.add('show');renderList(id);}
+function closeAllPop(){document.querySelectorAll('.pop').forEach(p=>p.classList.remove('show'));}
+// 渲染列表+删除功能
+function renderList(type){
+    let html="";
+    if(type=="playPop"){
+        let arr=JSON.parse(localStorage.playArr);
+        arr.forEach(gid=>{
+            let g=gameList.find(v=>v.id==gid);
+            html+=`<div class="list-item"><span>${g.name}</span><button class="del-btn" onclick="delPlay(${gid})">删除</button></div>`;
+        })
+        document.getElementById('playList').innerHTML=html||"<div style='text-align:center;padding:30px;'>暂无游玩记录</div>";
+    }
+    if(type=="colPop"){
+        let arr=JSON.parse(localStorage.colArr);
+        arr.forEach(gid=>{
+            let g=gameList.find(v=>v.id==gid);
+            html+=`<div class="list-item"><span>${g.name}</span><button class="del-btn" onclick="delCol(${gid})">取消收藏</button></div>`;
+        })
+        document.getElementById('colList').innerHTML=html||"<div style='text-align:center;padding:30px;'>暂无收藏</div>";
+    }
+    if(type=="likePop"){
+        let arr=JSON.parse(localStorage.likeArr);
+        arr.forEach(gid=>{
+            let g=gameList.find(v=>v.id==gid);
+            html+=`<div class="list-item"><span>${g.name}</span><button class="del-btn" onclick="delLike(${gid})">取消点赞</button></div>`;
+        })
+        document.getElementById('likeList').innerHTML=html||"<div style='text-align:center;padding:30px;'>暂无点赞</div>";
+    }
+}
+function delPlay(gid){
+    let arr=JSON.parse(localStorage.playArr);
+    arr=arr.filter(v=>v!=gid);
+    localStorage.playArr=JSON.stringify(arr);
+    refreshFootData();renderList('playPop');
+}
+function delCol(gid){
+    let arr=JSON.parse(localStorage.colArr);
+    arr=arr.filter(v=>v!=gid);
+    localStorage.colArr=JSON.stringify(arr);
+    refreshAllNum();refreshFootData();renderList('colPop');
+}
+function delLike(gid){
+    let arr=JSON.parse(localStorage.likeArr);
+    arr=arr.filter(v=>v!=gid);
+    localStorage.likeArr=JSON.stringify(arr);
+    refreshAllNum();refreshFootData();renderList('likePop');
+}
+
+// ========== 通关烟花+恭喜成功动画 ==========
+const fireCanvas=document.getElementById('fireCanvas');
+const fireCtx=fireCanvas.getContext('2d');
+fireCanvas.width=innerWidth;fireCanvas.height=innerHeight;
+let fireList=[];
+function showSuccess(){
+    playAudio("win");
+    fireCanvas.style.display="block";
+    document.querySelector('.success-text').style.display="block";
+    createFire();
+    setTimeout(()=>{
+        fireCanvas.style.display="none";
+        document.querySelector('.success-text').style.display="none";
+        fireList=[];
+    },3500)
+}
+function createFire(){
+    let colorArr=["#f65e3b","#ffc107","#4d7cff","#4caf50","#9c27b0"];
+    for(let i=0;i<6;i++){
+        setTimeout(()=>{
+            let x=Math.random()*fireCanvas.width;
+            let y=Math.random()*fireCanvas.height/2;
+            for(let j=0;j<40;j++){
+                fireList.push({
+                    x:x,y:y,sx:(Math.random()-0.5)*8,sy:(Math.random()-0.5)*8,
+                    color:colorArr[Math.floor(Math.random()*colorArr.length)],alpha:1
+                })
+            }
+        },i*200)
+    }
+    fireAnimate();
+}
+function fireAnimate(){
+    fireCtx.clearRect(0,0,fireCanvas.width,fireCanvas.height);
+    for(let i=fireList.length-1;i>=0;i--){
+        let p=fireList[i];
+        p.x+=p.sx;p.y+=p.sy;p.alpha-=0.015;
+        fireCtx.beginPath();
+        fireCtx.arc(p.x,p.y,4,0,Math.PI*2);
+        fireCtx.fillStyle=p.color;fireCtx.globalAlpha=p.alpha;
+        fireCtx.fill();
+        if(p.alpha<=0)fireList.splice(i,1);
+    }
+    fireCtx.globalAlpha=1;
+    if(fireList.length>0)requestAnimationFrame(fireAnimate);
+}
+
+// ========== 7款可玩小游戏完整逻辑 ==========
+// 1.2048游戏
+let grid2048=[];
+function init2048(){
+    grid2048=Array(4).fill().map(()=>Array(4).fill(0));
+    addRand2048();addRand2048();render2048();
+}
+function addRand2048(){
+    let empty=[];
+    for(let i=0;i<4;i++)for(let j=0;j<4;j++)if(grid2048[i][j]==0)empty.push([i,j]);
+    if(empty.length==0)return;
+    let [x,y]=empty[Math.floor(Math.random()*empty.length)];
+    grid2048[x][y]=Math.random()>0.1?2:4;
+}
+function render2048(){
+    let box=document.getElementById('g2048');box.innerHTML="";
+    for(let i=0;i<4;i++){
+        for(let j=0;j<4;j++){
+            let c=document.createElement('div');
+            c.className="g2048-cell";
+            let val=grid2048[i][j];
+            c.innerText=val||"";
+            if(val==2)c.style.background="#eee4da";
+            if(val==4)c.style.background="#ede0c8";
+            if(val==8)c.style.background="#f2b179",c.style.color="#fff";
+            if(val==16)c.style.background="#f59563",c.style.color="#fff";
+            if(val==32)c.style.background="#f67c5f",c.style.color="#fff";
+            if(val==64)c.style.background="#f65e3b",c.style.color="#fff";
+            if(val>=128)c.style.background="#edcf72",c.style.color="#fff";
+            box.appendChild(c);
+        }
+    }
+    // 通关判断
+    for(let i=0;i<4;i++)for(let j=0;j<4;j++)if(grid2048[i][j]==2048)showSuccess();
+}
+// 2048方向控制
+document.addEventListener('keydown',e=>{
+    if(nowIndex!==0)return;
+    let old=JSON.stringify(grid2048);
+    if(e.key=="ArrowLeft")moveLeft();
+    if(e.key=="ArrowRight")moveRight();
+    if(e.key=="ArrowUp")moveUp();
+    if(e.key=="ArrowDown")moveDown();
+    if(old!=JSON.stringify(grid2048)){addRand2048();render2048();playAudio("click");}
+})
+function moveLeft(){
+    for(let i=0;i<4;i++){
+        let row=grid2048[i].filter(v=>v);
+        for(let j=0;j<row.length-1;j++)if(row[j]==row[j+1]){row[j]*=2;row.splice(j+1,1);}
+        while(row.length<4)row.push(0);grid2048[i]=row;
+    }
+}
+function moveRight(){
+    for(let i=0;i<4;i++){
+        let row=grid2048[i].filter(v=>v);
+        for(let j=row.length-1;j>0;j--)if(row[j]==row[j-1]){row[j]*=2;row.splice(j-1,1);j--;}
+        while(row.length<4)row.unshift(0);grid2048[i]=row;
+    }
+}
+function moveUp(){
+    for(let j=0;j<4;j++){
+        let col=[];for(let i=0;i<4;i++)if(grid2048[i][j])col.push(grid2048[i][j]);
+        for(let i=0;i<col.length-1;i++)if(col[i]==col[i+1]){col[i]*=2;col.splice(i+1,1);}
+        while(col.length<4)col.push(0);
+        for(let i=0;i<4;i++)grid2048[i][j]=col[i];
+    }
+}
+function moveDown(){
+    for(let j=0;j<4;j++){
+        let col=[];for(let i=0;i<4;i++)if(grid2048[i][j])col.push(grid2048[i][j]);
+        for(let i=col.length-1;i>0;i--)if(col[i]==col[i-1]){col[i]*=2;col.splice(i-1,1);i--;}
+        while(col.length<4)col.unshift(0);
+        for(let i=0;i<4;i++)grid2048[i][j]=col[i];
+    }
+}
+
+// 2.贪吃蛇
+let snake=[{x:10,y:10}],foodPos={x:5,y:5},snakeDir="right",snakeTimer;
+function initSnake(){
+    clearInterval(snakeTimer);
+    snake=[{x:10,y:10}];snakeDir="right";createFood();renderSnake();
+    snakeTimer=setInterval(snakeRun,160);
+}
+function createFood(){
+    foodPos.x=Math.floor(Math.random()*20);
+    foodPos.y=Math.floor(Math.random()*20);
+}
+function renderSnake(){
+    let box=document.getElementById('snakeBox');box.innerHTML="";
+    for(let i=0;i<20;i++){
+        for(let j=0;j<20;j++){
+            let d=document.createElement('div');
+            if(snake.some(p=>p.x==j&&p.y==i))d.className="snake-body";
+            if(foodPos.x==j&&foodPos.y==i)d.className="snake-food";
+            box.appendChild(d);
+        }
+    }
+}
+function snakeRun(){
+    let head={...snake[0]};
+    if(snakeDir=="right")head.x++;
+    if(snakeDir=="left")head.x--;
+    if(snakeDir=="up")head.y--;
+    if(snakeDir=="down")head.y++;
+    // 撞墙
+    if(head.x<0||head.x>=20||head.y<0||head.y>=20){clearInterval(snakeTimer);alert("游戏结束！");return;}
+    snake.unshift(head);
+    if(head.x==foodPos.x&&head.y==foodPos.y){
+        createFood();playAudio("click");
+        if(snake.length>=12)showSuccess();
+    }else{snake.pop();}
+    renderSnake();
+}
+// 贪吃蛇滑动控制
+let sStartX=0,sStartY=0;
+document.getElementById('snakeBox').addEventListener('touchstart',e=>{sStartX=e.touches[0].clientX;sStartY=e.touches[0].clientY;})
+document.getElementById('snakeBox').addEventListener('touchend',e=>{
+    if(nowIndex!==1)return;
+    let ex=e.changedTouches[0].clientX,ey=e.changedTouches[0].clientY;
+    let dx=ex-sStartX,dy=ey-sStartY;
+    if(Math.abs(dx)>Math.abs(dy)){
+        if(dx>30&&snakeDir!="left")snakeDir="right";
+        if(dx<-30&&snakeDir!="right")snakeDir="left";
+    }else{
+        if(dy>30&&snakeDir!="up")snakeDir="down";
+        if(dy<-30&&snakeDir!="down")snakeDir="up";
+    }
+})
+
+// 3.井字棋
+let tttArr=[0,0,0,0,0,0,0,0,0],tttPlayer=1;
+function initTtt(){tttArr=[0,0,0,0,0,0,0,0,0];tttPlayer=1;renderTtt();}
+function renderTtt(){
+    let box=document.getElementById('tttBox');box.innerHTML="";
+    tttArr.forEach((v,i)=>{
+        let d=document.createElement('div');
+        d.className="ttt-cell";
+        if(v==1)d.innerText="X",d.style.color="#f65e3b";
+        if(v==2)d.innerText="O",d.style.color="#4d7cff";
+        d.onclick=()=>clickTtt(i);
+        box.appendChild(d);
+    })
+}
+function clickTtt(i){
+    if(tttArr[i]!=0)return;
+    tttArr[i]=tttPlayer;playAudio("click");
+    if(checkWin(tttPlayer)){setTimeout(showSuccess,300);return;}
+    tttPlayer=tttPlayer==1?2:1;renderTtt();
+}
+function checkWin(p){
+    let win=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    return win.some(v=>tttArr[v[0]]==p&&tttArr[v[1]]==p&&tttArr[v[2]]==p);
+}
+
+// 4.打砖块
+let breakCtx,ball,pad,bricks=[],breakRun;
+function initBreak(){
+    breakCtx=document.getElementById('breakCanvas').getContext('2d');
+    ball={x:140,y:280,r:6,sx:3,sy:-3};
+    pad={x:110,y:300,w:60,h:12};
+    bricks=[];
+    for(let i=0;i<5;i++)for(let j=0;j<7;j++)bricks.push({x:j*40+10,y:i*25+20,w:35,h:20,live:true});
+    cancelAnimationFrame(breakRun);breakGame();
+}
+function breakGame(){
+    breakCtx.clearRect(0,0,280,320);
+    // 挡板
+    breakCtx.fillStyle="#bbada0";
+    breakCtx.fillRect(pad.x,pad.y,pad.w,pad.h);
+    // 球
+    breakCtx.beginPath();breakCtx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);
+    breakCtx.fillStyle="#f65e3b";breakCtx.fill();
+    // 砖块
+    bricks.forEach(b=>{
+        if(b.live){breakCtx.fillStyle="#edcf72";breakCtx.fillRect(b.x,b.y,b.w,b.h);}
+    })
+    // 碰撞
+    ball.x+=ball.sx;ball.y+=ball.sy;
+    if(ball.x<ball.r||ball.x>280-ball.r)ball.sx*=-1;
+    if(ball.y<ball.r)ball.sy*=-1;
+    // 挡板碰撞
+    if(ball.y+ball.r>pad.y&&ball.x>pad.x&&ball.x<pad.x+pad.w)ball.sy*=-1;
+    // 砖块碰撞
+    let allDie=1;
+    bricks.forEach(b=>{
+        if(b.live){
+            allDie=0;
+            if(ball.x>b.x&&ball.x<b.x+b.w&&ball.y>b.y&&ball.y<b.y+b.h){
+                b.live=false;ball.sy*=-1;playAudio("click");
+            }
+        }
+    })
+    if(allDie){cancelAnimationFrame(breakRun);setTimeout(showSuccess,200);return;}
+    if(ball.y>320)initBreak();
+    breakRun=requestAnimationFrame(breakGame);
+}
+// 挡板滑动控制
+let bStartX=0;
+document.getElementById('breakCanvas').addEventListener('touchstart',e=>bStartX=e.touches[0].clientX);
+document.getElementById('breakCanvas').addEventListener('touchmove',e=>{
+    if(nowIndex!==3)return;
+    let dx=e.touches[0].clientX-bStartX;
+    pad.x+=dx/3;pad.x=Math.max(0,Math.min(220,pad.x));
+})
+
+// 5.记忆翻牌
+let memArr=[1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8],memOpen=[],memLock=false;
+function initMemory(){
+    memArr.sort(()=>Math.random()-0.5);memOpen=[];memLock=false;
+    let box=document.getElementById('memBox');box.innerHTML="";
+    memArr.forEach((v,i)=>{
+        let d=document.createElement('div');
+        d.style.width="60px";d.style.height="60px";d.style.background="#cdc1b4";
+        d.style.borderRadius="4px";d.style.display="flex";d.style.alignItems="center";
+        d.style.justifyContent="center";d.style.fontSize="22px";d.style.cursor="pointer";
+        d.dataset.id=v;d.dataset.index=i;d.innerText="?";
+        d.onclick=()=>clickMem(d,v);box.appendChild(d);
+    })
+}
+function clickMem(el,val){
+    if(memLock||el.innerText!="?")return;
+    el.innerText=val;el.style.background="#eee4da";memOpen.push({el,val});playAudio("click");
+    if(memOpen.length==2){
+        memLock=true;
+        if(memOpen[0].val==memOpen[1].val){
+            memOpen.forEach(o=>o.el.style.background="#a8d08d");
+            memOpen=[];memLock=false;
+            let allOk=[...document.querySelectorAll('#memBox div')].every(d=>d.innerText!="?");
+            if(allOk)setTimeout(showSuccess,300);
+        }else{
+            setTimeout(()=>{
+                memOpen.forEach(o=>{o.el.innerText="?";o.el.style.background="#cdc1b4";})
+                memOpen=[];memLock=false;
+            },600)
+        }
+    }
+}
+
+// 6.俄罗斯方块
+let tetCtx,tetMap=[],nowBlock,tetTimer;
+const blockType=[
+    [[1,1,1,1]],[[1,1],[1,1]],[[1,1,1],[0,1,0]],
+    [[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]],[[1,1,1],[1,0,0]],[[1,1,1],[0,0,1]]
+];
+function initTetris(){
+    tetCtx=document.getElementById('tetCanvas').getContext('2d');
+    tetMap=Array(20).fill().map(()=>Array(10).fill(0));
+    createBlock();clearInterval(tetTimer);tetTimer=setInterval(tetDown,400);
+}
+function createBlock(){
+    let idx=Math.floor(Math.random()*7);
+    nowBlock={type:blockType[idx],x:3,y:0};
+}
+function tetDown(){
+    if(checkMove(0,1))nowBlock.y++;
+    else{mergeBlock();clearLine();createBlock();}
+    renderTet();
+}
+function checkMove(x,y){
+    let b=nowBlock.type;
+    for(let i=0;i<b.length;i++){
+        for(let j=0;j<b[i].length;j++){
+            if(b[i][j]){
+                let nx=nowBlock.x+j+x,ny=nowBlock.y+i+y;
+                if(nx<0||nx>=10||ny>=20||(ny>=0&&tetMap[ny][nx]))return false;
+            }
+        }
+    }
+    return true;
+}
+function mergeBlock(){
+    let b=nowBlock.type;
+    for(let i=0;i<b.length;i++){
+        for(let j=0;j<b[i].length;j++){
+            if(b[i][j]&&nowBlock.y+i>=0)tetMap[nowBlock.y+i][nowBlock.x+j]=1;
+        }
+    }
+}
+function clearLine(){
+    let num=0;
+    for(let i=19;i>=0;i--){
+        if(tetMap[i].every(v=>v==1)){
+            tetMap.splice(i,1);tetMap.unshift(Array(10).fill(0));i++;num++;playAudio("click");
+        }
+    }
+    if(num>=5)setTimeout(showSuccess,200);
+}
+function renderTet(){
+    tetCtx.fillStyle="#faf8ef";tetCtx.fillRect(0,0,200,320);
+    // 固定方块
+    tetCtx.fillStyle="#bbada0";
+    for(let i=0;i<20;i++)for(let j=0;j<10;j++)if(tetMap[i][j])tetCtx.fillRect(j*20,i*16,18,14);
+    // 下落方块
+    tetCtx.fillStyle="#f65e3b";
+    let b=nowBlock.type;
+    for(let i=0;i<b.length;i++){
+        for(let j=0;j<b[i].length;j++){
+            if(b[i][j])tetCtx.fillRect((nowBlock.x+j)*20,(nowBlock.y+i)*16,18,14);
+        }
+    }
+}
+// 方块按键控制
+document.addEventListener('keydown',e=>{
+    if(nowIndex!==5)return;
+    if(e.key=="ArrowLeft"&&checkMove(-1,0))nowBlock.x--;
+    if(e.key=="ArrowRight"&&checkMove(1,0))nowBlock.x++;
+    if(e.key=="ArrowDown")tetDown();
+    renderTet();
+})
+
+// 7.三连消除
+let matchData=[],selectOne=null;
+const matchIcon=["🍎","🍊","🍋","🍇","🍓","🥝"];
+function initMatch(){
+    selectOne=null;matchData=[];
+    for(let i=0;i<25;i++)matchData.push(matchIcon[Math.floor(Math.random()*6)]);
+    renderMatch();
+}
+function renderMatch(){
+    let box=document.getElementById('matchBox');box.innerHTML="";
+    matchData.forEach((v,i)=>{
+        let d=document.createElement('div');
+        d.style.width="50px";d.style.height="50px";
+        d.style.background="#eee4da";d.style.borderRadius="6px";
+        d.style.display="flex";d.style.alignItems="center";d.style.justifyContent="center";
+        d.style.fontSize="24px";d.dataset.index=i;d.innerText=v;
+        d.onclick=()=>clickMatch(i);box.appendChild(d);
+    })
+}
+function clickMatch(idx){
+    playAudio("click");
+    if(!selectOne){selectOne=idx;return;}
+    // 判断相邻
+    let x1=selectOne%5,y1=Math.floor(selectOne/5);
+    let x2=idx%5,y2=Math.floor(idx/5);
+    let isNear=(Math.abs(x1-x2)==1&&y1==y2)||(Math.abs(y1-y2)==1&&x1==x2);
+    if(isNear){
+        [matchData[selectOne],matchData[idx]]=[matchData[idx],matchData[selectOne]];
+        checkMatchClear();
+    }
+    selectOne=null;renderMatch();
+}
+function checkMatchClear(){
+    let clearList=[];
+    // 横
+    for(let y=0;y<5;y++){
+        for(let x=0;x<3;x++){
+            let i=y*5+x;
+            if(matchData[i]==matchData[i+1]&&matchData[i]==matchData[i+2]){
+                clearList.push(i,i+1,i+2);
+            }
+        }
+    }
+    // 竖
+    for(let x=0;x<5;x++){
+        for(let y=0;y<3;y++){
+            let i=y*5+x;
+            if(matchData[i]==matchData[i+5]&&matchData[i]==matchData[i+10]){
+                clearList.push(i,i+5,i+10);
+            }
+        }
+    }
+    if(clearList.length>0){
+        clearList.forEach(i=>matchData[i]=matchIcon[Math.floor(Math.random()*6)]);
+        renderMatch();
+        setTimeout(()=>{
+            let allSame=matchData.every(v=>v==matchData[0]);
+            if(allSame)showSuccess();
+        },300)
+    }
+}
+
+// 页面初始化
+window.onload=function(){
+    initLocalData();
+    refreshFootData();
+    refreshAllNum();
+    init2048();
+    initSnake();
+    initTtt();
+    initBreak();
+    initMemory();
+    initTetris();
+    initMatch();
+    savePlayGame(gameList[0].id);
+}
+</script>
+</body>
+</html>
