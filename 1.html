@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>抖音小游戏</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #000;
+  color: #fff;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+.swipe-container {
+  height: 100%;
+  scroll-snap-type: y mandatory;
+  overflow-y: scroll;
+  scroll-behavior: smooth;
+}
+
+.game-screen {
+  width: 100%;
+  height: 100vh;
+  scroll-snap-align: start;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  padding-bottom: 100px;
+}
+
+.game-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.game-tip {
+  font-size: 12px;
+  color: #ccc;
+  background: rgba(255,255,255,0.1);
+  padding: 4px 10px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.game-canvas {
+  background: #111;
+  border-radius: 12px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.action-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #222;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.like-btn, .star-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #fff;
+}
+.like-btn.active { color: #ff4e4e; }
+.star-btn.active { color: #ffd600; }
+
+/* 底部抖音风格导航栏 */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: #111;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 999;
+  border-top: 1px solid #222;
+}
+.nav-item {
+  text-align: center;
+  font-size: 11px;
+  color: #999;
+}
+.nav-item.active {
+  color: #fff;
+}
+.nav-item .icon {
+  font-size: 22px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* 弹窗 */
+.modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 70px;
+  background: rgba(0,0,0,0.9);
+  z-index: 1000;
+  display: none;
+  padding: 20px;
+  overflow-y: auto;
+}
+.modal.show {
+  display: block;
+}
+.modal-title {
+  font-size: 18px;
+  margin-bottom: 15px;
+}
+.modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: #222;
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+.list-item {
+  background: #1a1a1a;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 6px 0;
+  display: flex;
+  justify-content: space-between;
+}
+.del-btn {
+  background: #ff4e4e;
+  border: none;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* 烟花 & 恭喜动画 */
+.fireworks {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  pointer-events: none;
+  z-index: 2000;
+  display: none;
+}
+.win-text {
+  position: fixed;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 15px #ff4e4e, 0 0 25px #ff0;
+  z-index: 2001;
+  display: none;
+  animation: flash 0.6s infinite alternate;
+}
+@keyframes flash {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.1); }
+}
+</style>
+</head>
+<body>
+
+<canvas class="fireworks" id="fireCanvas"></canvas>
+<div class="win-text" id="winText">恭喜成功！</div>
+
+<div id="app">
+  <div class="swipe-container" id="swipeContainer">
+
+    <!-- 游戏1: 2048 -->
+    <div class="game-screen" data-gid="1">
+      <div class="game-title">2048</div>
+      <div class="game-tip">电脑方向键 / 手机滑动合并数字，合成2048即通关</div>
+      <div id="game2048" style="display:grid;grid-template-columns:repeat(4,60px);gap:6px;background:#111;padding:10px;border-radius:12px;"></div>
+      <div class="control-group">
+        <div class="like-btn" id="like1" onclick="toggleLike(1)">
+          <div class="action-btn">❤️</div>
+          <div class="num" id="likeNum1">0</div>
+        </div>
+        <div class="star-btn" id="star1" onclick="toggleStar(1)">
+          <div class="action-btn">⭐</div>
+          <div class="num" id="starNum1">0</div>
+        </div>
+        <button class="action-btn" onclick="resetGame1()">🔄</button>
+      </div>
+    </div>
+
+    <!-- 游戏2: 贪吃蛇 -->
+    <div class="game-screen" data-gid="2">
+      <div class="game-title">贪吃蛇</div>
+      <div class="game-tip">滑动屏幕控制方向，吃到食物变长，不撞墙即可通关</div>
+      <div id="gameSnake" style="width:260px;height:260px;background:#111;display:grid;grid-template-columns:repeat(20,1fr);gap:1px;border-radius:12px;"></div>
+      <div class="control-group">
+        <div class="like-btn" id="like2" onclick="toggleLike(2)">
+          <div class="action-btn">❤️</div>
+          <div class="num" id="likeNum2">0</div>
+        </div>
+        <div class="star-btn" id="star2" onclick="toggleStar(2)">
+          <div class="action-btn">⭐</div>
+          <div class="num" id="starNum2">0</div>
+        </div>
+        <button class="action-btn" onclick="resetGame2()">🔄</button>
+      </div>
+    </div>
+
+    <!-- 游戏3: 井字棋 -->
+    <div class="game-screen" data-gid="3">
+      <div class="game-title">井字棋</div>
+      <div class="game-tip">双人轮流点击，连成一线即可获胜通关</div>
+      <div id="gameTic" style="display:grid;grid-template-columns:repeat(3,70px);gap:8px;background:#111;padding:10px;border-radius:12px;"></div>
+      <div class="control-group">
+        <div class="like-btn" id="like3" onclick="toggleLike(3)">
+          <div class="action-btn">❤️</div>
+          <div class="num" id="likeNum3">0</div>
+        </div>
+        <div class="star-btn" id="star3" onclick="toggleStar(3)">
+          <div class="action-btn">⭐</div>
+          <div class="num" id="starNum3">0</div>
+        </div>
+        <button class="action-btn" onclick="resetGame3()">🔄</button>
+      </div>
+    </div>
+
+    <!-- 游戏4: 打砖块 -->
+    <div class="game-screen" data-gid="4">
+      <div class="game-title">打砖块</div>
+      <div class="game-tip">左右滑动控制挡板，打掉所有砖块即可通关</div>
+      <canvas id="gameBreak" width="280" height="320" class="game-canvas"></canvas>
+      <div class="control-group">
+        <div class="like-btn" id="like4" onclick="toggleLike(4)">
+          <div class="action-btn">❤️</div>
+          <div class="num" id="likeNum4">0</div>
+        </div>
+        <div class="star-btn" id="star4" onclick="toggleStar(4)">
+          <div class="action-btn">⭐</div>
+          <div class="num" id="starNum4">0</div>
+        </div>
+        <button class="action-btn" onclick="resetGame4()">🔄</button>
+      </div>
+    </div>
+
+    <!-- 游戏5: 记忆翻牌 -->
+    <div class="game-screen" data-gid="5">
+      <div class="game-title">记忆翻牌</div>
+      <div class="game-tip">点击翻牌，找出所有相同对子即可通关</div>
+      <div id="gameMemory" style="display:grid;grid-template-columns:repeat(4,55px);gap:6px;background:#111;padding:10px;border-radius:12px;"></div>
+      <div class="control-group">
+        <div class="like-btn" id="like5" onclick="toggleLike(5)">
+          <div class="action-btn">❤️</div>
+          <div class="num" id="likeNum5">0</div>
+        </div>
+        <div class="star-btn" id="star5" onclick="toggleStar(5)">
+          <div class="action-btn">⭐</div>
+          <div class="num" id="starNum5">0</div>
+        </div>
+        <button class="action-btn" onclick="resetGame5()">🔄</button>
+      </div>
+    </div>
+
+    <!-- 游戏6: 俄罗斯方块 -->
+    <div class="game-screen" data-gid="6">
+      <div class="game-title">俄罗斯方块</div>
+      <div class="game-tip">方向键控制移动，填满一行消除，消除多行通关</div>
+      <canvas id="gameTetris" width="200" height="320" class="game-canvas"></canvas>
+      <div class="control-group">
+        <div class="like-btn" id="like6" onclick="toggleLike(6)">
+          <div class="action-btn">❤️</div>
+          <div class="num" id="likeNum6">0</div>
+        </div>
+        <div class="star-btn" id="star6" onclick="toggleStar(6)">
+          <div class="action-btn">⭐</div>
+          <div class="num" id="starNum6">0</div>
+        </div>
+        <button class="action-btn" onclick="resetGame6()">🔄</button>
+      </div>
+    </div>
+
+    <!-- 游戏7: 三连消除 -->
+    <div class="game-screen" data-gid="7">
+      <div class="game-title">三连消除</div>
+      <div class="game-tip">点击相邻图标互换，凑齐3个相同即可消除通关</div>
+      <div id="gameMatch" style="display:grid;grid-template-columns:repeat(5,48px);gap:5px;background:#111;padding:10px;border-radius:12px;"></div>
+      <div class="control-group">
+        <div class="like-btn" id="like7" onclick="toggleLike(7)">
+          <div class="action-btn">❤️</div>
+          <div class="num" id="likeNum7">0</div>
+        </div>
+        <div class="star-btn" id="star7" onclick="toggleStar(7)">
+          <div class="action-btn">⭐</div>
+          <div class="num" id="starNum7">0</div>
+        </div>
+        <button class="action-btn" onclick="resetGame7()">🔄</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 底部抖音风格导航 -->
+  <div class="bottom-nav">
+    <div class="nav-item active" id="navUser">
+      <div class="icon">👤</div>
+      <div id="username">玩家</div>
+    </div>
+    <div class="nav-item" onclick="openPlayed()">
+      <div class="icon">🎮</div>
+      <div>已玩 <span id="countPlayed">0</span></div>
+    </div>
+    <div class="nav-item" onclick="openLikes()">
+      <div class="icon">❤️</div>
+      <div>点赞 <span id="countLikes">0</span></div>
+    </div>
+    <div class="nav-item" onclick="openStars()">
+      <div class="icon">⭐</div>
+      <div>收藏 <span id="countStars">0</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal" id="modalPlayed">
+  <button class="modal-close" onclick="closeModal()">×</button>
+  <div class="modal-title">已玩游戏</div>
+  <div id="listPlayed"></div>
+</div>
+<div class="modal" id="modalLikes">
+  <button class="modal-close" onclick="closeModal()">×</button>
+  <div class="modal-title">我的点赞</div>
+  <div id="listLikes"></div>
+</div>
+<div class="modal" id="modalStars">
+  <button class="modal-close" onclick="closeModal()">×</button>
+  <div class="modal-title">我的收藏</div>
+  <div id="listStars"></div>
+</div>
+
+<script>
+// ==============================================
+// 全局数据 & localStorage
+// ==============================================
+const gameList = [
+  {id:1,name:"2048"},
+  {id:2,name:"贪吃蛇"},
+  {id:3,name:"井字棋"},
+  {id:4,name:"打砖块"},
+  {id:5,name:"记忆翻牌"},
+  {id:6,name:"俄罗斯方块"},
+  {id:7,name:"三连消除"}
+];
+
+function initStorage() {
+  if (!localStorage.username) {
+    let names = ["小白","小游","大神","萌新","追风","暖阳","星河"];
+    let rnd = names[Math.floor(Math.random()*names.length)] + (Math.floor(Math.random()*999));
+    localStorage.username = rnd;
+  }
+  if (!localStorage.played) localStorage.played = "[]";
+  if (!localStorage.likes) localStorage.likes = "[]";
+  if (!localStorage.stars) localStorage.stars = "[]";
+  if (!localStorage.likeCount) localStorage.likeCount = JSON.stringify({1:0,2:0,3:0,4:0,5:0,6:0,7:0});
+  if (!localStorage.starCount) localStorage.starCount = JSON.stringify({1:0,2:0,3:0,4:0,5:0,6:0,7:0});
+}
+
+function refreshUI() {
+  document.getElementById("username").innerText = localStorage.username;
+  document.getElementById("countPlayed").innerText = JSON.parse(localStorage.played).length;
+  document.getElementById("countLikes").innerText = JSON.parse(localStorage.likes).length;
+  document.getElementById("countStars").innerText = JSON.parse(localStorage.stars).length;
+
+  let likeCnt = JSON.parse(localStorage.likeCount);
+  let starCnt = JSON.parse(localStorage.starCount);
+  let likes = JSON.parse(localStorage.likes);
+  let stars = JSON.parse(localStorage.stars);
+
+  for (let i=1;i<=7;i++) {
+    if (document.getElementById("likeNum"+i)) document.getElementById("likeNum"+i).innerText = likeCnt[i];
+    if (document.getElementById("starNum"+i)) document.getElementById("starNum"+i).innerText = starCnt[i];
+    if (likes.includes(i)) document.getElementById("like"+i).classList.add("active");
+    else document.getElementById("like"+i).classList.remove("active");
+    if (stars.includes(i)) document.getElementById("star"+i).classList.add("active");
+    else document.getElementById("star"+i).classList.remove("active");
+  }
+}
+
+function addPlayed(gid) {
+  let arr = JSON.parse(localStorage.played);
+  if (!arr.includes(gid)) arr.push(gid);
+  localStorage.played = JSON.stringify(arr);
+  refreshUI();
+}
+
+function toggleLike(gid) {
+  let arr = JSON.parse(localStorage.likes);
+  let cnt = JSON.parse(localStorage.likeCount);
+  if (arr.includes(gid)) {
+    arr = arr.filter(x=>x!=gid);
+    cnt[gid] = Math.max(0, cnt[gid]-1);
+  } else {
+    arr.push(gid);
+    cnt[gid] = Math.min(999, cnt[gid]+1);
+  }
+  localStorage.likes = JSON.stringify(arr);
+  localStorage.likeCount = JSON.stringify(cnt);
+  refreshUI();
+}
+
+function toggleStar(gid) {
+  let arr = JSON.parse(localStorage.stars);
+  let cnt = JSON.parse(localStorage.starCount);
+  if (arr.includes(gid)) {
+    arr = arr.filter(x=>x!=gid);
+    cnt[gid] = Math.max(0, cnt[gid]-1);
+  } else {
+    arr.push(gid);
+    cnt[gid] = Math.min(999, cnt[gid]+1);
+  }
+  localStorage.stars = JSON.stringify(arr);
+  localStorage.starCount = JSON.stringify(cnt);
+  refreshUI();
+}
+
+// ==============================================
+// 弹窗
+// ==============================================
+function closeModal() {
+  document.querySelectorAll(".modal").forEach(m=>m.classList.remove("show"));
+}
+function openPlayed() {
+  closeModal();
+  document.getElementById("modalPlayed").classList.add("show");
+  renderList("played");
+}
+function openLikes() {
+  closeModal();
+  document.getElementById("modalLikes").classList.add("show");
+  renderList("likes");
+}
+function openStars() {
+  closeModal();
+  document.getElementById("modalStars").classList.add("show");
+  renderList("stars");
+}
+
+function renderList(type) {
+  let dom = {
+    played: "listPlayed",
+    likes: "listLikes",
+    stars: "listStars"
+  }[type];
+  let data = JSON.parse(localStorage[type]);
+  let html = "";
+  data.forEach(gid=>{
+    let name = gameList.find(g=>g.id==gid)?.name || "游戏";
+    html += `<div class="list-item"><span>${name}</span><button class="del-btn" onclick="delItem('${type}',${gid})">删除</button></div>`;
+  });
+  if (!html) html = "<div style='padding:20px;text-align:center;color:#666'>暂无记录</div>";
+  document.getElementById(dom).innerHTML = html;
+}
+
+function delItem(type,gid) {
+  let arr = JSON.parse(localStorage[type]);
+  arr = arr.filter(x=>x!=gid);
+  localStorage[type] = JSON.stringify(arr);
+  if (type==="likes") {
+    let c = JSON.parse(localStorage.likeCount);
+    c[gid] = Math.max(0,c[gid]-1);
+    localStorage.likeCount = JSON.stringify(c);
+  }
+  if (type==="stars") {
+    let c = JSON.parse(localStorage.starCount);
+    c[gid] = Math.max(0,c[gid]-1);
+    localStorage.starCount = JSON.stringify(c);
+  }
+  refreshUI();
+  renderList(type);
+}
+
+// ==============================================
+// 胜利烟花动画
+// ==============================================
+const fc = document.getElementById("fireCanvas");
+const fx = fc.getContext("2d");
+fc.width = window.innerWidth;
+fc.height = window.innerHeight;
+let particles = [];
+
+function showWin() {
+  document.getElementById("winText").style.display = "block";
+  fc.style.display = "block";
+  launchFireworks();
+  setTimeout(()=>{
+    document.getElementById("winText").style.display = "none";
+    fc.style.display = "none";
+    particles = [];
+  }, 3000);
+}
+
+function launchFireworks() {
+  let colors = ["#ff4e4e","#ff0","#0f0","#0ff","#f0f","#ff8800"];
+  for (let i=0;i<6;i++) {
+    setTimeout(()=>{
+      let cx = Math.random() * fc.width;
+      let cy = Math.random() * fc.height/2;
+      for (let j=0;j<50;j++) {
+        particles.push({
+          x:cx, y:cy,
+          vx:(Math.random()-0.5)*8,
+          vy:(Math.random()-0.5)*8,
+          life:1, color:colors[Math.floor(Math.random()*colors.length)]
+        });
+      }
+    },i*150);
+  }
+  fireLoop();
+}
+
+function fireLoop() {
+  fx.clearRect(0,0,fc.width,fc.height);
+  for (let i=particles.length-1;i>=0;i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.01;
+    if (p.life<=0) { particles.splice(i,1); continue; }
+    fx.beginPath();
+    fx.arc(p.x,p.y,3,0,Math.PI*2);
+    fx.fillStyle = p.color;
+    fx.globalAlpha = p.life;
+    fx.fill();
+  }
+  fx.globalAlpha = 1;
+  if (particles.length>0) requestAnimationFrame(fireLoop);
+}
+
+// ==============================================
+// 7个游戏完整逻辑（全部可玩）
+// ==============================================
+// 游戏1: 2048
+let grid2048 = [];
+function resetGame1() {
+  grid2048 = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  rand2048();rand2048();draw2048();
+}
+function rand2048() {
+  let emp = [];
+  for (let i=0;i<4;i++) for (let j=0;j<4;j++) if (grid2048[i][j]==0) emp.push([i,j]);
+  if (emp.length==0) return;
+  let [i,j] = emp[Math.floor(Math.random()*emp.length)];
+  grid2048[i][j] = Math.random()>0.9?4:2;
+}
+function draw2048() {
+  let box = document.getElementById("game2048");
+  box.innerHTML = "";
+  for (let i=0;i<4;i++) {
+    for (let j=0;j<4;j++) {
+      let d = document.createElement("div");
+      d.style.width="60px";d.style.height="60px";d.style.borderRadius="8px";
+      d.style.background="#222";d.style.display="flex";
+      d.style.alignItems="center";d.style.justifyContent="center";
+      d.style.fontSize="20px";d.style.fontWeight="bold";
+      let v = grid2048[i][j];
+      d.innerText = v||"";
+      if (v==2) d.style.background="#333";
+      if (v==4) d.style.background="#442";
+      if (v==8) d.style.background="#840";
+      if (v==16) d.style.background="#804";
+      if (v==32) d.style.background="#c04";
+      if (v==64) d.style.background="#f04";
+      if (v>=128) d.style.background="#fc4";
+      box.appendChild(d);
+      if (v==2048) setTimeout(showWin,300);
+    }
+  }
+}
+document.addEventListener("keydown",e=>{
+  let old = JSON.stringify(grid2048);
+  if (e.key=="ArrowLeft") move2048(0);
+  if (e.key=="ArrowRight") move2048(1);
+  if (e.key=="ArrowUp") move2048(2);
+  if (e.key=="ArrowDown") move2048(3);
+  if (old!=JSON.stringify(grid2048)) { rand2048(); draw2048(); }
+});
+function move2048(dir) {
+  let g = JSON.parse(JSON.stringify(grid2048));
+  if (dir==0) for (let i=0;i<4;i++) g[i] = merge(g[i]);
+  if (dir==1) for (let i=0;i<4;i++) g[i] = merge(g[i].reverse()).reverse();
+  if (dir==2) for (let j=0;j<4;j++) { let c=[g[0][j],g[1][j],g[2][j],g[3][j]]; c=merge(c); for (let i=0;i<4;i++) g[i][j]=c[i]; }
+  if (dir==3) for (let j=0;j<4;j++) { let c=[g[0][j],g[1][j],g[2][j],g[3][j]]; c=merge(c.reverse()).reverse(); for (let i=0;i<4;i++) g[i][j]=c[i]; }
+  grid2048 = g;
+}
+function merge(row) {
+  let r = row.filter(x=>x);
+  for (let i=0;i<r.length-1;i++) {
+    if (r[i]==r[i+1]) { r[i]*=2; r[i+1]=0; }
+  }
+  r = r.filter(x=>x);
+  while (r.length<4) r.push(0);
+  return r;
+}
+
+// 游戏2: 贪吃蛇
+let snake, food, dir, snakeLoop;
+function resetGame2() {
+  clearInterval(snakeLoop);
+  snake = [{x:10,y:10}];
+  dir = "right";
+  makeFood();
+  drawSnake();
+  snakeLoop = setInterval(moveSnake,150);
+}
+function makeFood() {
+  food = {x:Math.floor(Math.random()*20), y:Math.floor(Math.random()*20)};
+}
+function drawSnake() {
+  let box = document.getElementById("gameSnake");
+  box.innerHTML = "";
+  for (let i=0;i<20;i++) {
+    for (let j=0;j<20;j++) {
+      let d = document.createElement("div");
+      if (snake.some(p=>p.x==j&&p.y==i)) d.style.background="#0f0";
+      if (food.x==j&&food.y==i) d.style.background="#f00";
+      box.appendChild(d);
+    }
+  }
+}
+function moveSnake() {
+  let h = {...snake[0]};
+  if (dir=="right") h.x++;
+  if (dir=="left") h.x--;
+  if (dir=="up") h.y--;
+  if (dir=="down") h.y++;
+  if (h.x<0||h.x>=20||h.y<0||h.y>=20) { clearInterval(snakeLoop); alert("游戏结束"); return; }
+  snake.unshift(h);
+  if (h.x==food.x&&h.y==food.y) {
+    makeFood();
+    if (snake.length>10) { clearInterval(snakeLoop); showWin(); }
+  } else {
+    snake.pop();
+  }
+  drawSnake();
+}
+document.getElementById("gameSnake").addEventListener("touchstart",e=>{
+  let sx = e.touches[0].clientX;
+  let sy = e.touches[0].clientY;
+  document.getElementById("gameSnake").ontouchend = ee=>{
+    let dx = ee.changedTouches[0].clientX - sx;
+    let dy = ee.changedTouches[0].clientY - sy;
+    if (Math.abs(dx)>Math.abs(dy)) {
+      if (dx>20 && dir!="left") dir="right";
+      if (dx<-20 && dir!="right") dir="left";
+    } else {
+      if (dy>20 && dir!="up") dir="down";
+      if (dy<-20 && dir!="down") dir="up";
+    }
+  }
+});
+
+// 游戏3: 井字棋
+let tic, turn;
+function resetGame3() {
+  tic = [0,0,0,0,0,0,0,0,0];
+  turn = 1;
+  drawTic();
+}
+function drawTic() {
+  let box = document.getElementById("gameTic");
+  box.innerHTML = "";
+  tic.forEach((v,i)=>{
+    let d = document.createElement("div");
+    d.style.width="70px";d.style.height="70px";
+    d.style.background="#222";d.style.borderRadius="8px";
+    d.style.display="flex";d.style.alignItems="center";d.style.justifyContent="center";
+    d.style.fontSize="30px";
+    if (v==1) { d.innerText="X"; d.style.color="#f00"; }
+    if (v==2) { d.innerText="O"; d.style.color="#0f0"; }
+    d.onclick = ()=>clickTic(i);
+    box.appendChild(d);
+  });
+}
+function clickTic(i) {
+  if (tic[i]!=0) return;
+  tic[i] = turn;
+  if (checkTic(turn)) { showWin(); return; }
+  turn = turn==1?2:1;
+  drawTic();
+}
+function checkTic(p) {
+  let win = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  return win.some(w=>tic[w[0]]==p&&tic[w[1]]==p&&tic[w[2]]==p);
+}
+
+// 游戏4: 打砖块
+let ctx4, ball4, pad4, bricks4, loop4;
+function resetGame4() {
+  cancelAnimationFrame(loop4);
+  ctx4 = document.getElementById("gameBreak").getContext("2d");
+  ball4 = {x:140,y:250,r:6,vx:3,vy:-3};
+  pad4 = {x:110,y:290,w:60,h:10};
+  bricks4 = [];
+  for (let i=0;i<5;i++) for (let j=0;j<7;j++) bricks4.push({x:j*40,y:i*20+20,w:35,h:15,show:true});
+  loopBreak();
+}
+function loopBreak() {
+  ctx4.clearRect(0,0,280,320);
+  ctx4.fillStyle="#0f0"; ctx4.fillRect(pad4.x,pad4.y,pad4.w,pad4.h);
+  ctx4.beginPath(); ctx4.arc(ball4.x,ball4.y,ball4.r,0,Math.PI*2); ctx4.fillStyle="#fff"; ctx4.fill();
+  bricks4.forEach(b=>{ if (b.show) { ctx4.fillStyle="#f80"; ctx4.fillRect(b.x,b.y,b.w,b.h); } });
+  ball4.x += ball4.vx; ball4.y += ball4.vy;
+  if (ball4.x<6||ball4.x>274) ball4.vx*=-1;
+  if (ball4.y<6) ball4.vy*=-1;
+  if (ball4.y+6>pad4.y && ball4.x>pad4.x && ball4.x<pad4.x+pad4.w) ball4.vy*=-1;
+  let all = true;
+  bricks4.forEach(b=>{
+    if (!b.show) return;
+    all = false;
+    if (ball4.x>b.x&&ball4.x<b.x+b.w&&ball4.y>b.y&&ball4.y<b.y+b.h) {
+      b.show = false; ball4.vy*=-1;
+    }
+  });
+  if (all) { cancelAnimationFrame(loop4); showWin(); return; }
+  if (ball4.y>320) resetGame4();
+  loop4 = requestAnimationFrame(loopBreak);
+}
+document.getElementById("gameBreak").addEventListener("touchmove",e=>{
+  let x = e.touches[0].clientX;
+  let bx = document.getElementById("gameBreak").getBoundingClientRect().left;
+  pad4.x = Math.max(0,Math.min(220,x-bx-pad4.w/2));
+});
+
+// 游戏5: 记忆翻牌
+let memCards, memOpen, memLock;
+function resetGame5() {
+  memCards = [1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8];
+  memCards.sort(()=>Math.random()-0.5);
+  memOpen = []; memLock = false;
+  let box = document.getElementById("gameMemory");
+  box.innerHTML = "";
+  memCards.forEach((v,i)=>{
+    let d = document.createElement("div");
+    d.style.width="55px";d.style.height="55px";
+    d.style.background="#333";d.style.borderRadius="8px";
+    d.style.display="flex";d.style.alignItems="center";d.style.justifyContent="center";
+    d.style.fontSize="20px";
+    d.dataset.val = v;
+    d.innerText = "?";
+    d.onclick = ()=>clickMem(d);
+    box.appendChild(d);
+  });
+}
+function clickMem(el) {
+  if (memLock || el.innerText!="?") return;
+  let v = el.dataset.val;
+  el.innerText = v;
+  el.style.background="#444";
+  memOpen.push({el,v});
+  if (memOpen.length==2) {
+    memLock = true;
+    if (memOpen[0].v==memOpen[1].v) {
+      memOpen.forEach(o=>o.el.style.background="#060");
+      memOpen = []; memLock = false;
+      let all = true;
+      document.querySelectorAll("#gameMemory div").forEach(d=>{ if (d.innerText=="?") all=false; });
+      if (all) showWin();
+    } else {
+      setTimeout(()=>{
+        memOpen.forEach(o=>{ o.innerText="?"; o.style.background="#333"; });
+        memOpen = []; memLock = false;
+      },600);
+    }
+  }
+}
+
+// 游戏6: 俄罗斯方块
+let ctx6, grid6, block6, loop6;
+const shapes = [
+  [[1,1,1,1]],[[1,1],[1,1]],[[1,1,1],[0,1,0]],
+  [[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]],[[1,1,1],[1,0,0]],[[1,1,1],[0,0,1]]
+];
+function resetGame6() {
+  clearInterval(loop6);
+  ctx6 = document.getElementById("gameTetris").getContext("2d");
+  grid6 = Array(20).fill().map(()=>Array(10).fill(0));
+  newBlock6();
+  loop6 = setInterval(moveDown6,400);
+  draw6();
+}
+function newBlock6() {
+  let s = shapes[Math.floor(Math.random()*shapes.length)];
+  block6 = {x:3,y:0,shape:s};
+}
+function moveDown6() {
+  if (canMove(0,1)) block6.y++;
+  else { merge6(); clearLines6(); newBlock6(); }
+  draw6();
+}
+function canMove(dx,dy) {
+  let s = block6.shape;
+  for (let i=0;i<s.length;i++) {
+    for (let j=0;j<s[i].length;j++) {
+      if (s[i][j]) {
+        let x = block6.x+j+dx;
+        let y = block6.y+i+dy;
+        if (x<0||x>=10||y>=20||(y>=0&&grid6[y][x])) return false;
+      }
+    }
+  }
+  return true;
+}
+function merge6() {
+  let s = block6.shape;
+  for (let i=0;i<s.length;i++) {
+    for (let j=0;j<s[i].length;j++) {
+      if (s[i][j]&&block6.y+i>=0) grid6[block6.y+i][block6.x+j]=1;
+    }
+  }
+}
+function clearLines6() {
+  let n=0;
+  for (let i=19;i>=0;i--) {
+    if (grid6[i].every(x=>x==1)) {
+      grid6.splice(i,1);
+      grid6.unshift(Array(10).fill(0));
+      n++;
+    }
+  }
+  if (n>=3) showWin();
+}
+function draw6() {
+  ctx6.fillStyle="#000"; ctx6.fillRect(0,0,200,320);
+  ctx6.fillStyle="#0f0";
+  for (let i=0;i<20;i++) for (let j=0;j<10;j++) if (grid6[i][j]) ctx6.fillRect(j*20,i*16,18,14);
+  let s = block6.shape;
+  for (let i=0;i<s.length;i++) for (let j=0;j<s[i].length;j++) {
+    if (s[i][j]) ctx6.fillRect((block6.x+j)*20,(block6.y+i)*16,18,14);
+  }
+}
+document.addEventListener("keydown",e=>{
+  if (e.key=="ArrowLeft"&&canMove(-1,0)) block6.x--;
+  if (e.key=="ArrowRight"&&canMove(1,0)) block6.x++;
+  if (e.key=="ArrowDown") moveDown6();
+  draw6();
+});
+
+// 游戏7: 三连消除
+let matchData, selMatch;
+const em = ["🍎","🍊","🍋","🍇","🍓","🥝"];
+function resetGame7() {
+  matchData = [];
+  selMatch = null;
+  for (let i=0;i<25;i++) matchData.push(em[Math.floor(Math.random()*em.length)]);
+  drawMatch();
+}
+function drawMatch() {
+  let box = document.getElementById("gameMatch");
+  box.innerHTML = "";
+  matchData.forEach((v,i)=>{
+    let d = document.createElement("div");
+    d.style.width="48px";d.style.height="48px";
+    d.style.background="#222";d.style.borderRadius="8px";
+    d.style.display="flex";d.style.alignItems="center";d.style.justifyContent="center";
+    d.style.fontSize="24px";
+    d.innerText = v;
+    d.onclick = ()=>clickMatch(i);
+    box.appendChild(d);
+  });
+}
+function clickMatch(i) {
+  if (selMatch==null) { selMatch=i; return; }
+  let x1=selMatch%5, y1=Math.floor(selMatch/5);
+  let x2=i%5, y2=Math.floor(i/5);
+  let near = (Math.abs(x1-x2)==1&&y1==y2)||(Math.abs(y1-y2)==1&&x1==x2);
+  if (near) {
+    [matchData[selMatch],matchData[i]] = [matchData[i],matchData[selMatch]];
+    checkMatch();
+  }
+  selMatch = null;
+  drawMatch();
+}
+function checkMatch() {
+  let del = [];
+  for (let y=0;y<5;y++) {
+    for (let x=0;x<3;x++) {
+      let i = y*5+x;
+      if (matchData[i]==matchData[i+1]&&matchData[i]==matchData[i+2]) del.push(i,i+1,i+2);
+    }
+  }
+  for (let x=0;x<5;x++) {
+    for (let y=0;y<3;y++) {
+      let i = y*5+x;
+      if (matchData[i]==matchData[i+5]&&matchData[i]==matchData[i+10]) del.push(i,i+5,i+10);
+    }
+  }
+  if (del.length>0) {
+    del.forEach(i=>matchData[i]=em[Math.floor(Math.random()*em.length)]);
+    drawMatch();
+    setTimeout(()=>{
+      let allSame = matchData.every(x=>x==matchData[0]);
+      if (allSame) showWin();
+    },300);
+  }
+}
+
+// ==============================================
+// 初始化
+// ==============================================
+window.onload = function() {
+  initStorage();
+  refreshUI();
+  resetGame1();
+  resetGame2();
+  resetGame3();
+  resetGame4();
+  resetGame5();
+  resetGame6();
+  resetGame7();
+
+  // 滑动自动记录已玩
+  let lastScreen = 0;
+  document.getElementById("swipeContainer").addEventListener("scroll",()=>{
+    let top = document.getElementById("swipeContainer").scrollTop;
+    let h = window.innerHeight;
+    let cur = Math.round(top/h);
+    if (cur!=lastScreen) {
+      lastScreen = cur;
+      addPlayed(cur+1);
+    }
+  });
+}
+</script>
+</body>
+</html>
